@@ -46,6 +46,6 @@ The native preview worker uses [SixNG](https://github.com/holdmysocks/SixNG). Th
 
 ## Licensing
 
-OpenSix's own source is publicly viewable. The copyright holder reserves the rights to that code. Third-party components remain under their respective licenses. SixNG and the modifications to SixNG are covered by [GPL-3.0-only](third_party/sixng/COPYING).
+The [OpenSix Noncommercial License](LICENSE) allows you to build and use OpenSix as supplied for free for noncommercial purposes. Commercial use, modification, and paid redistribution require permission. SixNG and changes to it remain under [GPL-3.0-only](third_party/sixng/COPYING).
 
 OpenSix is an independent project. Grand Theft Auto and Rockstar Games are marks of their respective owners.
