@@ -1,0 +1,71 @@
+{
+  "name": "opensix",
+  "version": "1.0.0",
+  "description": "Read-only GTA VI RPF9 archive browser",
+  "author": "OpenSix",
+  "private": true,
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "build:viewer": "esbuild ui.mjs --bundle --format=esm --minify --legal-comments=external --outfile=assets/ui.bundle.mjs",
+    "build:ui": "node make-icon.mjs && npm run build:viewer",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "three": "0.187.0"
+  },
+  "overrides": {
+    "app-builder-lib": { "minimatch": "11.0.1" },
+    "@electron/universal": { "minimatch": "11.0.1" }
+  },
+  "build": {
+    "appId": "local.opensix.desktop",
+    "productName": "OpenSix",
+    "asar": true,
+    "forceCodeSigning": false,
+    "artifactName": "OpenSix.exe",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "workspace.mjs",
+      "available-ranges.mjs",
+      "resource-preview.mjs",
+      "rpf9.mjs",
+      "names.mjs",
+      "index.html",
+      "style.css",
+      "asset-preview.mjs",
+      "assets/ui.bundle.mjs",
+      "assets/ui.bundle.mjs.LEGAL.txt",
+      "icon.svg",
+      "assets/OpenSix.ico",
+      "assets/scarlett-archive-extents.json",
+      "assets/window.png"
+    ],
+    "extraResources": [
+      { "from": "worker/opensix-preview.exe", "to": "opensix-preview.exe" }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/OpenSix.ico",
+      "executableName": "OpenSix"
+    },
+    "portable": {
+      "requestExecutionLevel": "user"
+    }
+  }
+}

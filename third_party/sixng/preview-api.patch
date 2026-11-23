@@ -1,0 +1,35 @@
+diff --git a/crates/sixng-core/src/audio.rs b/crates/sixng-core/src/audio.rs
+index 5861988..5649b1c 100644
+--- a/crates/sixng-core/src/audio.rs
++++ b/crates/sixng-core/src/audio.rs
+@@ -246,7 +246,7 @@ pub fn parse_header(h: &[u8], off: u64) -> Option<Bank> {
+ }
+ 
+ /// Fill in format fields from the bank bytes (header + small chunks).
+-fn read_formats(f: &mut File, bank: &mut Bank) -> Result<()> {
++pub fn read_formats(f: &mut (impl Read + Seek), bank: &mut Bank) -> Result<()> {
+     for s in bank.streams.iter_mut() {
+         let fc = s.chunks.iter().find(|c| (c.kind == CH_FORMAT || c.kind == CH_FORMAT_ALT) && c.size >= 20).cloned();
+         if let Some(c) = fc {
+diff --git a/crates/sixng-core/src/export.rs b/crates/sixng-core/src/export.rs
+index 258ea06..371f9bd 100644
+--- a/crates/sixng-core/src/export.rs
++++ b/crates/sixng-core/src/export.rs
+@@ -1180,7 +1180,7 @@ fn material_uv_fit(lod_groups: &[Vec<crate::gltf::NodeGroup>], shader: usize) ->
+     crate::material::uv_fit(lod.into_iter().flatten().flat_map(|n| &n.prims).filter(|p| p.material == Some(shader)))
+ }
+ 
+-pub(crate) struct BuiltDrawable {
++pub struct BuiltDrawable {
+     /// Node groups per LOD (index = LOD level).
+     pub lod_groups: Vec<Vec<crate::gltf::NodeGroup>>,
+     /// Models of embedded drawables (fragment children, sub-drawables).
+@@ -1200,7 +1200,7 @@ pub(crate) struct BuiltDrawable {
+ /// relative to `dir` (a folder under `o.out`); textures are written under
+ /// `o.out`. `member`: `info` is one drawable-dictionary member
+ /// (`drawable::select_member`), so geometries outside its models are left out.
+-pub(crate) fn build_drawable(a: &ArchiveInfo, e: &Entry, r: &Resource, info: &crate::drawable::DrawableInfo, dir: &Path, member: bool, o: &ExportOptions, item: &mut ExportedItem) -> BuiltDrawable {
++pub fn build_drawable(a: &ArchiveInfo, e: &Entry, r: &Resource, info: &crate::drawable::DrawableInfo, dir: &Path, member: bool, o: &ExportOptions, item: &mut ExportedItem) -> BuiltDrawable {
+     let head = head_skin_shaders(a, e, &info.shaders, o, item).or_else(|| part_skin_shaders(a, e, &info.shaders, item));
+     let shader_tex = link_textures(a, head.as_ref().map_or(&info.shaders[..], |h| &h.0[..]), r, &info.embedded_textures, dir, o, e.name.as_deref());
+     // Vehicles (models whose shaders bind the material palette): the part

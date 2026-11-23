@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="194" viewBox="0 0 256 194">
+  <defs>
+    <linearGradient id="rim" x1="0" x2="1" y1="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop stop-color="#41e7dc"/>
+      <stop offset=".44" stop-color="#986bf2"/>
+      <stop offset="1" stop-color="#ff5c9f"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" x2="0" y1="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop stop-color="#36e6d7"/>
+      <stop offset=".53" stop-color="#a198ff"/>
+      <stop offset="1" stop-color="#ff87b7"/>
+    </linearGradient>
+  </defs>
+  <path d="M56 18h164l19 19v101l-38 38H37l-20-20V57z" fill="#181026" stroke="url(#rim)" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M178 51h-51c-28 0-51 23-51 51v11c0 18 15 33 33 33h23c17 0 31-14 31-31s-14-31-31-31H96m68 62h16" fill="none" stroke="url(#mark)" stroke-width="17" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
