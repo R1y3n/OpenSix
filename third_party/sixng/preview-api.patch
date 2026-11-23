@@ -11,6 +11,68 @@ index 5861988..5649b1c 100644
      for s in bank.streams.iter_mut() {
          let fc = s.chunks.iter().find(|c| (c.kind == CH_FORMAT || c.kind == CH_FORMAT_ALT) && c.size >= 20).cloned();
          if let Some(c) = fc {
+diff --git a/crates/sixng-core/src/drawable.rs b/crates/sixng-core/src/drawable.rs
+index d14a061..3746958 100644
+--- a/crates/sixng-core/src/drawable.rs
++++ b/crates/sixng-core/src/drawable.rs
+@@ -99,7 +99,8 @@ pub struct MeshBlobHeader {
+     pub w: f32,
+     pub unk_5c: u32,
+     /// Vertex count: positions are 8 bytes each from 0x80 up to the next
+-    /// stream (12 bytes from 0x60 for float positions).
++    /// stream or the end of a packed positions-only buffer (12 bytes from
++    /// 0x60 for float positions).
+     pub vertex_count_guess: Option<u32>,
+     /// Slot 0 is format 0x63 (3 x f32, unquantised) at 0x60 instead of
+     /// packed u16 at 0x80. Seen on cable drawables.
+@@ -334,12 +335,17 @@ pub fn parse_mesh_blob(b: &[u8]) -> Option<MeshBlobHeader> {
+             sections.push((slot, (v >> 8) * 2, v & 0xff));
+         }
+     }
+-    let vertex_count_guess = sections
++    let position_end = sections
+         .iter()
+         .map(|s| s.1)
+         .filter(|&o| o > p0 && (o as usize) <= b.len())
+         .min()
+-        .map(|o| (o - p0) / stride);
++        .or_else(|| {
++            let end = u32::try_from(b.len()).ok()?;
++            (sections.as_slice() == [(0, 0x80, 0x42)] && end > p0 && (end - p0) % stride == 0)
++                .then_some(end)
++        });
++    let vertex_count_guess = position_end.map(|end| (end - p0) / stride);
+     Some(MeshBlobHeader {
+         sections,
+         position_base: if float_positions { [0.0; 3] } else { [f32le(b, 0x60), f32le(b, 0x64), f32le(b, 0x68)] },
+@@ -361,7 +367,7 @@ pub fn find_buffers(r: &Resource) -> Vec<GfxBuffer> {
+             let dw = r.u32(p + 8) as u64;
+             if let Some(go) = r.gfx_off(ptr) {
+                 let bytes = dw * 4;
+-                let mesh_blob = r.gfx.get(go..(go + bytes as usize).min(r.gfx.len())).and_then(parse_mesh_blob);
++                let mesh_blob = r.gfx.get(go..go + bytes as usize).and_then(parse_mesh_blob);
+                 v.push(GfxBuffer {
+                     struct_off: p as u64,
+                     gfx_off: go as u64,
+@@ -1539,6 +1545,18 @@ mod dictionary_tests {
+ mod meshlet_tests {
+     use super::*;
+ 
++    #[test]
++    fn packed_positions_only_buffer_uses_its_extent() {
++        let mut blob = vec![0; 0x80 + 3 * 8];
++        blob[..4].copy_from_slice(&0x4042u32.to_le_bytes());
++        let header = parse_mesh_blob(&blob).unwrap();
++        assert_eq!(header.vertex_count_guess, Some(3));
++        assert_eq!(decode_positions(&blob, &header).len(), 3);
++
++        blob.pop();
++        assert_eq!(parse_mesh_blob(&blob).unwrap().vertex_count_guess, None);
++    }
++
+     #[test]
+     fn meshlets_with_32_bit_counts() {
+         // two meshlets; the second one's remap start (65,636) wraps in its
 diff --git a/crates/sixng-core/src/export.rs b/crates/sixng-core/src/export.rs
 index 258ea06..371f9bd 100644
 --- a/crates/sixng-core/src/export.rs

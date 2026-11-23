@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, ensure, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sixng_core::{
-    audio, classify::Kind, drawable, export::{self, ExportOptions, ExportedItem},
+    audio, bounds, classify::Kind, drawable, export::{self, ExportOptions, ExportedItem},
     game::ArchiveInfo, gltf, resource::Resource, scan::Entry, texture,
 };
 use std::{env, fs, io::Cursor, path::{Path, PathBuf}};
@@ -60,6 +60,20 @@ fn model(req: &Request, resource: &Resource, out: &Path) -> Result<Value> {
     fs::write(out.join(file),glb)?;
     Ok(json!({"type":"model","file":file,"name":title,"items":members,"lods":lods,"detail":lod,
         "index":req.index,"triangles":triangles,"warnings":item.warnings}))
+}
+
+fn collision(req: &Request, resource: &Resource, out: &Path) -> Result<Value> {
+    let bounds = bounds::decode(resource).context("Unsupported collision bounds")?;
+    let triangles: usize = bounds.by_mat.values().map(|(_, indices)| indices.len() / 3).sum();
+    ensure!(triangles > 0, "This collision resource has no supported geometry");
+
+    let file = "model.glb";
+    let metadata = json!({ "bounds": bounds.bbox, "stats": bounds.stats });
+    fs::write(out.join(file), bounds.glb(&req.name, metadata))?;
+    Ok(json!({
+        "type": "model", "file": file, "items": [], "lods": [0], "detail": 0,
+        "index": null, "triangles": triangles, "note": "Collision bounds"
+    }))
 }
 
 fn textures(req: &Request, resource: &Resource, out: &Path) -> Result<Value> {
@@ -144,6 +158,7 @@ fn run() -> Result<Value> {
     let resource=Resource{sys:data,gfx,gfx_base:0};
     match request.kind.as_str() {
         "model" => model(&request,&resource,&out),
+        "collision" => collision(&request,&resource,&out),
         "textures" => textures(&request,&resource,&out),
         _ => bail!("Unknown preview kind"),
     }

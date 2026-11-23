@@ -16,6 +16,7 @@ const formats = new Map([
 
 export function resourceKind(extension, bytes) {
   if (['zdr','zft','zdd'].includes(extension)) return 'model';
+  if (['zbn','zbd'].includes(extension)) return 'collision';
   if (extension==='ztd') return 'textures';
   if (['awc','zawc','adat'].includes(extension) || bytes?.toString('ascii',0,4)==='ADAT') return 'bank';
   return null;
