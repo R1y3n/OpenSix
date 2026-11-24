@@ -24,6 +24,9 @@ Check a local copy with `Get-FileHash -Algorithm SHA256 -LiteralPath '<path to e
 | Bink / Bink 2 | Play and seek in supported movies with the local helper. |
 | 0DRP v122 and PSIN | Inspect structure and section information and save JSON reports. |
 | MHIU, PNG, JPEG, GIF, WebP, WAV, Ogg | Preview supported heightmaps, images, and audio inside an archive. |
+| Tool menu | Cross-archive search and JSON index export, interactive MHIU terrain, typed PSIN, localization CSV and JSON, navigation GLB and FBX, map placement and weather reports, vehicle handling, groom and cloth OBJ, particle rules, and script XML for recognized records. |
+| SGD5 shader records | Browse shader groups, members and effect links from a complete supported `shaders.rpf`. Extract decoded DXBC blocks. |
+| Xbox GPU BVH | Inspect and export the verified sample tied to its matching drawable. Other BVH layouts need independent verification. |
 
 ## Known limits
 

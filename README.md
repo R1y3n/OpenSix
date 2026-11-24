@@ -2,7 +2,7 @@
 
 OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Open an RPF9, follow its nested archives, and preview or extract assets without launching the game. OpenSix reads your files in place.
 
-**[Download OpenSix.exe for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md)
+**[Download OpenSix.exe for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
 
 ![OpenSix decoding a diner scene from GTA VI’s UI texture pool](docs/images/archive-browser.png)
 
@@ -17,6 +17,12 @@ OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Ope
 - **Browse textures.** Preview texture dictionaries and open TTPF pools directly. Search texture keys, select mip levels and supported array slices, cube faces, or volume slices, save PNG previews, and export DDS mip chains. The built-in VIctory decoder extends BCPack coverage when its table file is available.
 - **Play audio and video.** Preview supported ADAT Opus and PCM streams, save music stems, and export XMA2 tracks. With FFmpeg, XMA2 can also play in the app. With the Bink player helper, play, pause, step through, or seek in supported Bink movies.
 - **Read resource metadata.** Inspect 0DRP structures and PSIN sections, save their reports as JSON, and preview text, hex, common images, WAV and Ogg audio, and supported MHIU heightmaps.
+- **Find files across open archives.** Use **Archive** to search names, hashes and indexed model labels, or export the current archive's entry index as JSON.
+- **Open an interactive terrain map.** Pan and zoom a selected MHIU heightmap and inspect its world coordinates and sampled elevation. Inspect map placements and timecycle and weather XML in the same menu.
+- **Work with navigation meshes.** Preview a decoded tile in 3D, isolate polygons with the road flag, and save the mesh as GLB or FBX. Export the source coordinates, vertex indices and polygon flags as JSON.
+- **Inspect more resource types.** Read vehicle handling, particle rules and keyframes, groom guides, and cloth constraints. Save hair guides and cloth constraints as OBJ lines. Open a decoded audio bank or Bink movie from the **Assets** menu.
+- **Search localization tables.** Search a decoded table by label hash or text and save CSV or JSON. Read typed PSIN fields and export recognized script documents as XML.
+- **Inspect shader groups and Xbox GPU BVH data.** Browse decoded SGD5 members and effect links in a complete supported `shaders.rpf`. Preview the geometry for the verified Xbox GPU BVH sample and export it with its compressed BVH, geometry buffers, transforms and address descriptors.
 
 ## Getting started
 

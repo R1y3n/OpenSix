@@ -12,6 +12,47 @@
 <body>
   <header class="app-bar">
     <div class="brand"><img class="brand-icon" src="/icon.svg" alt="" width="47" height="36"><span>OpenSix</span></div>
+    <nav class="app-menu" aria-label="OpenSix tools">
+      <details>
+        <summary>Archive</summary>
+        <div class="menu-items">
+          <button type="button" data-action="open">Open RPF9…</button>
+          <button type="button" data-action="pool">Open texture pool…</button>
+          <button type="button" data-action="names" data-archive-only>Import paths…</button>
+          <button type="button" data-action="search" data-archive-only>Search open archives…</button>
+          <button type="button" data-action="entries" data-archive-only>Export archive index…</button>
+          <button type="button" data-action="shaders" data-archive-only>Export shader index…</button>
+        </div>
+      </details>
+      <details>
+        <summary>World</summary>
+        <div class="menu-items">
+          <button type="button" data-tool="terrain">Terrain map…</button>
+          <button type="button" data-tool="toolMap">Map placements…</button>
+          <button type="button" data-tool="toolNavmesh">Navigation mesh…</button>
+          <button type="button" data-tool="toolTimecycle">Timecycle and weather…</button>
+        </div>
+      </details>
+      <details>
+        <summary>Assets</summary>
+        <div class="menu-items">
+          <button type="button" data-tool="toolHandling">Vehicle handling…</button>
+          <button type="button" data-tool="toolGroom">Hair and fur guides…</button>
+          <button type="button" data-tool="toolCloth">Cloth constraints…</button>
+          <button type="button" data-tool="toolParticles">Particle effects…</button>
+          <button type="button" data-tool="bank">Audio bank…</button>
+          <button type="button" data-tool="movie">Bink movie…</button>
+        </div>
+      </details>
+      <details>
+        <summary>Data</summary>
+        <div class="menu-items">
+          <button type="button" data-tool="toolText">Localization strings…</button>
+          <button type="button" data-tool="toolPso">Typed PSIN…</button>
+          <button type="button" data-tool="toolScript">Script document…</button>
+        </div>
+      </details>
+    </nav>
     <div class="toolbar">
       <button id="import-names" type="button" disabled>Import paths</button>
       <button id="open" class="primary" type="button">Open archive</button>
@@ -99,6 +140,23 @@
       <p id="open-error" class="notice" role="alert" hidden></p>
       <div class="dialog-actions"><button id="cancel" type="button">Cancel</button><button class="primary" id="submit" type="submit">Open</button></div>
     </form>
+  </dialog>
+  <dialog id="tool-dialog" aria-labelledby="tool-title">
+    <div class="dialog-title"><h2 id="tool-title"></h2><button id="close-tool" type="button" aria-label="Close tool">×</button></div>
+    <form id="tool-source">
+      <p id="tool-selection" class="quiet"></p>
+      <div class="tool-actions">
+        <button id="tool-selected" class="primary" type="submit">Use selected entry</button>
+        <button id="tool-browse" type="button">Open decoded file…</button>
+        <label id="tool-road-filter" hidden><input type="checkbox" id="tool-roads"> Roads only</label>
+      </div>
+    </form>
+    <form id="tool-search-form" hidden>
+      <label for="tool-query">Search names, hashes or model labels</label>
+      <div class="path-picker"><input id="tool-query" type="search" required maxlength="250"><button type="submit">Search</button></div>
+    </form>
+    <p id="tool-status" class="notice" role="status" hidden></p>
+    <div id="tool-output"></div>
   </dialog>
 </body>
 </html>

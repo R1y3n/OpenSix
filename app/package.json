@@ -1,6 +1,6 @@
 {
   "name": "opensix",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Read-only GTA VI RPF9 archive browser",
   "author": "OpenSix",
   "private": true,
@@ -39,6 +39,9 @@
       "available-ranges.mjs",
       "resource-preview.mjs",
       "rpf9.mjs",
+      "shader-index.mjs",
+      "gpu-bvh.mjs",
+      "zip-output.mjs",
       "names.mjs",
       "index.html",
       "style.css",
@@ -50,6 +53,8 @@
       "icon.svg",
       "assets/OpenSix.ico",
       "assets/scarlett-archive-extents.json",
+      "assets/scarlett-xbox-bvh.json",
+      "assets/scarlett-verified-paths.txt",
       "assets/window.png"
     ],
     "extraResources": [

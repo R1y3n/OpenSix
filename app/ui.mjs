@@ -1,4 +1,5 @@
 import { renderAsset } from './asset-viewer.mjs';
+import { setupTools } from './tools-menu.mjs';
 
 const el = id => document.getElementById(id);
 const model = { archives: [], active: null, selection: null, scope: '', page: 0, listRevision: 0, previewRevision: 0 };
@@ -460,21 +461,33 @@ function requery() {
 }
 
 el('open').addEventListener('click', () => el('open-dialog').showModal());
+async function openPool() {
+  const path=await window.opensix.choose('pool');
+  if (!path) return;
+  const data=await api('/api/open-pool',{path});
+  model.archives=data.archives;
+  freshState(data.selected);
+  if (el('open-dialog').open) el('open-dialog').close();
+  message();
+  renderArchives();
+  await loadList();
+}
 el('choose-pool').addEventListener('click', async () => {
   const trigger=el('choose-pool');
   trigger.disabled=true;
-  try {
-    const path=await window.opensix.choose('pool');
-    if (!path) return;
-    const data=await api('/api/open-pool',{path});
-    model.archives=data.archives;
-    freshState(data.selected);
-    el('open-dialog').close();
-    message();
+  try { await openPool(); }
+  catch(error) { message(error.message,true,el('open-error')); }
+  finally { trigger.disabled=false; }
+});
+setupTools({
+  current:()=>({archive:model.active,entry:model.selection}), openPool, notify:message,
+  async openFound({archive,entry},query) {
+    freshState(archive);
+    el('search').value=query;
     renderArchives();
     await loadList();
-  } catch(error) { message(error.message,true,el('open-error')); }
-  finally { trigger.disabled=false; }
+    await selectEntry(entry);
+  },
 });
 for (const id of ['cancel', 'close-dialog']) el(id).addEventListener('click', () => el('open-dialog').close());
 for (const [buttonId,kind,inputId] of [

@@ -12,6 +12,7 @@ const outputs = new Map();
 const formats = new Map([
   ['.glb','model/gltf-binary'],['.png','image/png'],['.opus','audio/ogg'],
   ['.wav','audio/wav'],['.xma','application/octet-stream'],['.json','application/json'],['.dds','image/vnd-ms.dds'],
+  ['.csv','text/csv'],['.xml','application/xml'],['.obj','text/plain'],
 ]);
 
 export function resourceKind(extension, bytes) {
@@ -68,7 +69,7 @@ function embedModelImages(folder) {
 
 export async function buildAssetPreview(request, bytes, clip, parts=[]) {
   const isPool=request.kind.startsWith('pool');
-  const name = isPool || request.kind==='wardrobe' ? 'opensix-pool.exe' : 'opensix-preview.exe';
+  const name = isPool || ['wardrobe','gpuBvhMesh'].includes(request.kind) ? 'opensix-pool.exe' : 'opensix-preview.exe';
   const worker = process.resourcesPath && existsSync(join(process.resourcesPath,name))
     ? join(process.resourcesPath,name)
     : join(root,'worker',name);
@@ -82,7 +83,7 @@ export async function buildAssetPreview(request, bytes, clip, parts=[]) {
     const {stdout} = await execute(worker,[folder],{windowsHide:true,timeout:120_000,maxBuffer,
       env:isPool ? poolEnvironment() : process.env});
     const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
-    if (result.type==='poolIndex' || result.type==='unrecognized') {
+    if (['poolIndex','gpuBvhMesh','unrecognized'].includes(result.type)) {
       rmSync(folder,{recursive:true,force:true});
       return result;
     }
@@ -90,20 +91,36 @@ export async function buildAssetPreview(request, bytes, clip, parts=[]) {
     if (result.type==='bank' && result.tracks.some(track=>track.file==='track.xma')) {
       await addXmaPlayback(folder,result);
     }
-    const id = randomBytes(16).toString('hex');
-    outputs.set(id,folder);
-    while (outputs.size>5) removePreview(outputs.keys().next().value);
-    return {...result, id};
+    return keepPreview(folder,result,request.archive ? [request.archive] : []);
   } catch (error) {
     rmSync(folder,{recursive:true,force:true});
     throw new Error(error.stderr?.toString().trim() || error.message);
   }
 }
 
+function keepPreview(folder,result,sources=[]) {
+  const id = randomBytes(16).toString('hex');
+  outputs.set(id,{folder,sources});
+  while (outputs.size>5) removePreview(outputs.keys().next().value);
+  return {...result,id};
+}
+
+export function previewMeshGlb(data, details) {
+  const folder = mkdtempSync(join(tmpdir(),'opensix-view-'));
+  try {
+    writeFileSync(join(folder,'model.glb'),data);
+    return keepPreview(folder,{type:'model',file:'model.glb',items:[],lods:[],...details});
+  } catch (error) {
+    rmSync(folder,{recursive:true,force:true});
+    throw error;
+  }
+}
+
 function poolEnvironment() {
   if (process.env.OPENSIX_BCPACK_TABLES) return process.env;
   const portable=process.env.PORTABLE_EXECUTABLE_DIR;
-  const path=[portable && isAbsolute(portable) && join(portable,'bcpack-tables.bin'),
+  const path=[process.resourcesPath && join(process.resourcesPath,'bcpack-tables.bin'),
+    portable && isAbsolute(portable) && join(portable,'bcpack-tables.bin'),
     join(root,'..','.deps','victory','crates','victory-formats','src','bcpack-tables.bin')]
     .find(candidate=>candidate && existsSync(candidate));
   return path ? {...process.env,OPENSIX_BCPACK_TABLES:path} : process.env;
@@ -127,7 +144,7 @@ async function addXmaPlayback(folder, result) {
 }
 
 function removePreview(id) {
-  const folder = outputs.get(id);
+  const folder = outputs.get(id)?.folder;
   outputs.delete(id);
   if (folder) rmSync(folder,{recursive:true,force:true});
 }
@@ -137,12 +154,13 @@ export function clearAssetPreviews() {
 }
 
 export function assetPreviewFile(id, name) {
-  const folder = outputs.get(id);
+  const output = outputs.get(id);
+  const folder = output?.folder;
   const mime = (typeof name==='string' && /^[\w.-]+$/.test(name)) ? formats.get(extname(name)) : undefined;
   if (!folder || !mime) return null;
   const path = join(folder,name);
   if (!existsSync(path)) return null;
   const absolute = realpathSync(path);
   if (!within(realpathSync(folder),absolute) || !statSync(absolute).isFile()) return null;
-  return {path:absolute,mime};
+  return {path:absolute,mime,sources:output.sources};
 }

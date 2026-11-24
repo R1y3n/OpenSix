@@ -8,6 +8,7 @@ use sixng_core::{
 use std::{env, fs, io::Cursor, path::{Path, PathBuf}};
 
 mod inspect;
+mod tools;
 
 #[derive(Deserialize)]
 struct Request {
@@ -332,7 +333,13 @@ fn run() -> Result<Value> {
     let data = fs::read(out.join("entry.bin"))?;
     if request.kind=="bank" { return sound(&request,&data,&out); }
     if request.kind=="psin" { return inspect::psin(&data,&out); }
+    if matches!(request.kind.as_str(),"toolText" | "toolPso" | "toolHandling" | "toolScript" | "toolTimecycle") {
+        return tools::unpaged(&request.kind,&data,&out);
+    }
     let resource=split_resource(data,request.system_size.context("Missing RAGE system page size")?)?;
+    if request.kind.starts_with("tool") {
+        return tools::resource(&request.kind,&resource,&request.name,request.detail==Some(1),&out);
+    }
     match request.kind.as_str() {
         "model" => model(&request,&resource,&out),
         "collision" => collision(&request,&resource,&out),

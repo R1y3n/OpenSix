@@ -1,5 +1,15 @@
 # Using OpenSix
 
+## Top menus
+
+Use **Archive** to open files, import paths, search open archives, and export the selected archive index. When a complete supported `shaders.rpf` is selected, **Export shader index** writes the decoded records and their searchable names and links.
+
+**World**, **Assets**, and **Data** open separate tool dialogs. Select a file in the archive browser first and choose **Use selected entry**, or use **Open decoded file** to work with an extracted resource. For a resource with separate system and graphics pages, use the corresponding archive entry so OpenSix can read the layout from its directory record.
+
+- **World** opens terrain, placement, navigation and timecycle tools. Navigation tiles can be filtered to road polygons and exported as GLB, FBX or JSON.
+- **Assets** opens handling, groom, cloth and particle reports, plus audio-bank and movie playback. Bink and XMA2 playback use the helpers documented below.
+- **Data** opens the localization search, typed PSIN inspection and script XML extraction. Localization CSV preserves game text and quotes spreadsheet formula prefixes as literal text.
+
 Download [OpenSix.exe](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. Choose the executable and archive from the supported Scarlett build. OpenSix reads the executable to get the archive format tables, and the game stays closed.
 
 ## Archives and filenames

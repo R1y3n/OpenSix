@@ -101,7 +101,7 @@ export class GameExecutable {
   }
 
   *pathReferences() {
-    // Read the local file's path literals in place. No game dictionaries are bundled.
+    // Read path literals from the supplied executable.
     const rdata = this.#sections.find(section => section.rva === 99880960);
     const raw = this.#image.toString('latin1', rdata.offset, rdata.offset + rdata.bytes);
     yield* candidatePaths(raw);

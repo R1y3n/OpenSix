@@ -147,6 +147,30 @@ dialog label { display: block; color: var(--subtle); }
 .path-picker input { flex: 1; min-width: 0; }
 .dialog-actions { display: flex; justify-content: end; gap: 8px; margin-top: 17px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.app-menu { display: flex; align-items: center; gap: 3px; margin: 0 auto 0 6px; }
+.app-menu details { position: relative; }
+.app-menu summary { list-style: none; cursor: pointer; padding: 6px 9px; border-radius: 5px; white-space: nowrap; }
+.app-menu summary::-webkit-details-marker { display: none; }
+.app-menu summary:hover, .app-menu details[open] > summary { color: var(--accent); background: var(--selected); }
+.app-menu summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.menu-items { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 205px;
+  padding: 5px; border: 1px solid var(--rule); border-radius: 7px; background: var(--panel); box-shadow: 0 12px 24px #090713c4; }
+.menu-items button { justify-content: start; white-space: nowrap; }
+#tool-dialog { width: min(930px, calc(100vw - 42px)); }
+#tool-dialog .notice { margin-top: 10px; }
+.tool-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 10px; }
+.tool-actions label { display: flex; align-items: center; gap: 4px; }
+.tool-actions input[type=checkbox] { width: auto; }
+.tool-scroll { max-height: min(480px, 53vh); overflow: auto; }
+.tool-table { display: grid; margin-block: 8px; }
+.tool-table > div { display: grid; grid-template-columns: minmax(98px, 15%) minmax(0, 1fr); gap: 12px;
+  align-items: start; padding: 7px 8px; border-bottom: 1px solid var(--rule); }
+.tool-table > div span { overflow-wrap: anywhere; white-space: pre-wrap; }
+.tool-table code { color: var(--accent); }
+.tool-result { display: flex; justify-content: space-between; width: 100%; text-align: left; white-space: normal; gap: 10px; }
+.tool-map { display: block; width: 100%; height: clamp(230px, 47vh, 450px); border: 1px solid var(--rule);
+  background: var(--bg); border-radius: 6px; cursor: grab; touch-action: none; }
+.tool-map:active { cursor: grabbing; }
 @media (max-width: 1050px) {
   .workspace { grid-template-columns: 160px minmax(350px, 1fr) 252px; }
   .contents { padding-inline: 12px; }

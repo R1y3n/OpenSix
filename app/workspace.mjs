@@ -7,11 +7,16 @@ import { hasByteRange, readAvailableRanges } from './available-ranges.mjs';
 import { previewResource } from './resource-preview.mjs';
 import { assetPreviewFile, buildAssetPreview, resourceKind } from './asset-preview.mjs';
 import { isBink, movieCommand, movieFrame, openMovie, stopMovie } from './bink-playback.mjs';
+import { indexShaderRows } from './shader-index.mjs';
+import { isXboxBvhArchive, openXboxBvh } from './gpu-bvh.mjs';
 
 const defaults = { executable: '', folder: '' };
 
 const archiveExtensions = new Set(['.rpf', '.rpf9']);
 const modelExtensions = new Set(['zdr','zft','zdd']);
+const shaderDirectoryHash = '15f896951d3608eb45ca446c9d8198513076c0c9f2c3dd79981af8eb083a9af1';
+const toolKinds = new Set(['toolText','toolPso','toolHandling','toolScript','toolTimecycle',
+  'toolNavmesh','toolMap','toolGroom','toolCloth','toolParticles','terrain','bank','movie']);
 const expectedExtents = Object.entries(JSON.parse(readFileSync(new URL('./assets/scarlett-archive-extents.json', import.meta.url),'utf8')));
 
 let workspace = null;
@@ -58,9 +63,24 @@ function mount(state, path, parent = null, row = null) {
   return info;
 }
 
-function addArchive(state, path) {
+function addArchive(state, path, bvh) {
   const old = [...state.archives.values()].find(item => item.parent === null && item.archive.path === path);
-  const opened = mount(state, path);
+  let opened;
+  if (bvh && !bvh.complete) {
+    // Open only the hash-verified sample rows when the archive itself is incomplete.
+    const key='a'+(++sequence);
+    const archive={path,name:basename(path)+' · Verified Xbox GPU BVH',size:bvh.coreSize,rows:[],rowCount:0};
+    opened={key,archive,parent:null,row:null};
+    state.archives.set(key,opened);
+  } else {
+    opened=mount(state, path);
+  }
+  if (bvh) {
+    const {archive}=opened;
+    archive.bvhSources=bvh.entry.sources;
+    archive.rows.push({id:archive.rows.length,bvh:bvh.entry});
+    archive.rowCount=archive.rows.length;
+  }
   if (old) {
     const stale = new Set([old.key]);
     for (const [key, item] of state.archives) {
@@ -88,7 +108,7 @@ function rowFor(info, input) {
 function describeArchive(info, state) {
   const { archive } = info;
   let resolved = 0;
-  if (!archive.pool) for (const row of archive.rows) if (state.names.resolve(row)) resolved++;
+  if (!archive.pool) for (const row of archive.rows) if (row.bvh || row.shader || state.names.resolve(row)) resolved++;
   return {
     id: info.key, name: archive.name, path: archive.path, parent: info.parent,
     size: archive.size, entries: archive.rowCount, resolved, pool: Boolean(archive.pool),
@@ -102,6 +122,17 @@ function describeArchive(info, state) {
 function describeRow(row, state) {
   if (row.pool) return { ...row, hash64:row.key, hash32:null, resolved:false, type:row.format,
     kind:'poolTexture', encrypted:false, chunks:null, nestedAvailable:false };
+  if (row.bvh) {
+    const {name,size,stored,offset,hash}=row.bvh;
+    return {id:row.id,name,type:'GPU BVH',size,stored,offset,hash64:hash,hash32:null,
+      resolved:true,nameSource:'Verified Xbox GPU BVH and matching drawable',
+      kind:'gpuBvh',encrypted:false,chunks:null,nestedAvailable:false};
+  }
+  if (row.shader) {
+    const {name,type,size,stored,offset,hash,keywords}=row.shader;
+    return {id:row.id,name,type,size,stored,offset,hash64:hash,hash32:null,keywords,
+      resolved:true,nameSource:'Native SGD5 records',kind:'shaderRecord',encrypted:false,chunks:null,nestedAvailable:false};
+  }
   const name = state.names.resolve(row);
   return {
     id: row.id, name: name?.path ?? fallbackName(row, state.game), modelLabels:row.modelLabels ?? [],
@@ -152,7 +183,7 @@ function scanReferences(state, infos) {
   let files = 0;
   for (const { archive } of infos) {
     for (const row of archive.rows) {
-      if (row.kind === 'archive' || row.size > 2 * 1024 * 1024 ||
+      if (row.bvh || row.kind === 'archive' || row.size > 2 * 1024 * 1024 ||
           row.stored > 2 * 1024 * 1024 || bytes + row.size > 128 * 1024 * 1024) continue;
       try {
         const payload = decodePayload(state.game, archive, row);
@@ -189,7 +220,7 @@ async function indexArchiveModels(key) {
   let indexed=0, unavailable=0;
   try {
     for (const row of info.archive.rows) {
-      if (!modelExtensions.has(state.game.extension(row.type)) || !row.systemSize) continue;
+      if (row.bvh || !modelExtensions.has(state.game.extension(row.type)) || !row.systemSize) continue;
       if (!Object.hasOwn(row,'modelLabels')) {
         try {
           indexModelLabels(row,decodePayload(state.game,info.archive,row));
@@ -280,7 +311,16 @@ export function* scanEntries(archive, search='') {
 
 function matchesSearch(entry, search) {
   return [entry.name, entry.hash64 ?? '', entry.hash32 ?? '', entry.type, entry.shape ?? '',
-    ...(entry.modelLabels ?? [])].some(value=>value.toLowerCase().includes(search));
+    ...(entry.modelLabels ?? []), ...(entry.keywords ?? [])].some(value=>value.toLowerCase().includes(search));
+}
+
+async function addShaderRecords(state, info) {
+  const {archive}=info;
+  if (!/^shaders\.rpf9?$/i.test(archive.name) && archive.headerHash!==shaderDirectoryHash) return;
+  const entries=await indexShaderRows(state.game,archive);
+  if (workspace!==state || state.archives.get(info.key)!==info) return;
+  for (const shader of entries) archive.rows.push({id:archive.rows.length,shader});
+  archive.rowCount=archive.rows.length;
 }
 
 function verifyPool(archive) {
@@ -313,6 +353,44 @@ async function openPool(input) {
 
 
 const deliver = value => value;
+async function openArchives(input) {
+  const path = getPath(input.path);
+  const executable = input.executable ? getPath(input.executable, '.exe') : workspace?.executable;
+  if (!executable) fail('Enter the matching Scarlett executable path.');
+  const state = workspace?.executable === executable ? workspace : {
+    executable, game: new GameExecutable(executable), archives: new Map(
+      [...(workspace?.archives ?? [])].filter(([,item])=>item.archive.pool)), names: null,
+  };
+  if (!state.names) state.names = new FilenameIndex(state.game);
+  const isFolder = statSync(path).isDirectory();
+  const paths = isFolder ? readdirSync(path, { withFileTypes: true, recursive: true })
+    .filter(entry => entry.isFile() && archiveExtensions.has(extname(entry.name).toLowerCase()))
+    .map(entry => join(entry.parentPath, entry.name)).sort() : [path];
+  if (!paths.length) fail('No .rpf or .rpf9 archives were found in that folder.');
+  const newlyOpened = [];
+  const issues = [];
+  for (const file of paths) {
+    let bvh;
+    if (isXboxBvhArchive(file)) {
+      try { bvh=await openXboxBvh(state.game,executable,file); }
+      catch (error) { issues.push(basename(file)+' · '+error.message); }
+    }
+    try { newlyOpened.push(addArchive(state,file,bvh)); }
+    catch (error) { issues.push(basename(file)+' · '+error.message); }
+  }
+  if (!newlyOpened.length) fail(issues.join('\n'));
+  for (const file of paths) state.names.add(basename(file), 'Local archive name');
+  const scanned = input.indexReferences===false ? 0 : scanReferences(state, newlyOpened);
+  workspace = state;
+  for (const info of newlyOpened) {
+    try { await addShaderRecords(state,info); }
+    catch(error) { issues.push(info.archive.name+' · '+error.message); }
+  }
+  if (workspace!==state) fail('The workspace changed while opening archives.');
+  const selected = newlyOpened.find(item => item.archive.name.toLowerCase() === 'common.rpf') ?? newlyOpened[0];
+  return deliver({ ...view(state, selected), issues, scanned });
+}
+
 export function dispatch(endpoint, input) {
   if (typeof endpoint !== 'string' || !endpoint.startsWith('/api/')) fail('Invalid action.');
   const url = new URL(endpoint, 'opensix://app');
@@ -328,33 +406,10 @@ export function dispatch(endpoint, input) {
   if (post && route === '/api/wardrobe-assembly') return assembleWardrobe(input);
   if (post && route === '/api/movie-frame') return movieFrame(input.id,input.version);
   if (post && route === '/api/movie-command') return movieCommand(input.id,input.action,input.value);
-  if (post && route === '/api/open') {
-    const path = getPath(input.path);
-    const executable = input.executable ? getPath(input.executable, '.exe') : workspace?.executable;
-    if (!executable) fail('Enter the matching Scarlett executable path.');
-    const state = workspace?.executable === executable ? workspace : {
-      executable, game: new GameExecutable(executable), archives: new Map(
-        [...(workspace?.archives ?? [])].filter(([,item])=>item.archive.pool)), names: null,
-    };
-    if (!state.names) state.names = new FilenameIndex(state.game);
-    const isFolder = statSync(path).isDirectory();
-    const paths = isFolder ? readdirSync(path, { withFileTypes: true, recursive: true })
-      .filter(entry => entry.isFile() && archiveExtensions.has(extname(entry.name).toLowerCase()))
-      .map(entry => join(entry.parentPath, entry.name)).sort() : [path];
-    if (!paths.length) fail('No .rpf or .rpf9 archives were found in that folder.');
-    const newlyOpened = [];
-    const issues = [];
-    for (const file of paths) {
-      try { newlyOpened.push(addArchive(state, file)); }
-      catch (error) { issues.push(basename(file) + ' · ' + error.message); }
-    }
-    if (!newlyOpened.length) fail(issues.join('\n'));
-    for (const file of paths) state.names.add(basename(file), 'Local archive name');
-    const scanned = input.indexReferences===false ? 0 : scanReferences(state, newlyOpened);
-    workspace = state;
-    const selected = newlyOpened.find(item => item.archive.name.toLowerCase() === 'common.rpf') ?? newlyOpened[0];
-    return deliver({ ...view(state, selected), issues, scanned });
-  }
+  if (post && route === '/api/tool') return runTool(input);
+  if (post && route === '/api/tool-table') return readToolTable(input);
+  if (post && route === '/api/workspace-search') return searchWorkspace(input);
+  if (post && route === '/api/open') return openArchives(input);
   if (post && route === '/api/names') {
     const state = requireWorkspace();
     if (!state.names) fail('Open an RPF9 archive before importing paths.');
@@ -397,10 +452,104 @@ export function dispatch(endpoint, input) {
   fail('Action is missing.', 404);
 }
 
+function searchWorkspace({ query }) {
+  if (typeof query !== 'string' || query.length > 250 || !query.trim()) fail('Enter a search term.');
+  const state = requireWorkspace();
+  const rows = [];
+  let total = 0;
+  for (const {key,archive} of state.archives.values()) {
+    for (const entry of scanEntries(key,query)) {
+      total++;
+      if (rows.length < 250) rows.push({archive:key,archiveName:archive.name,entry});
+    }
+  }
+  return {total,rows};
+}
+
+let toolTable;
+function readToolTable({ id, query = '', offset = 0 }) {
+  const file = assetPreviewFile(id,'report.json');
+  if (!file) fail('Reopen the localization table.');
+  if (typeof query !== 'string' || query.length > 250 || !Number.isSafeInteger(offset) || offset < 0) fail('Invalid table query.');
+  if (toolTable?.id !== id) {
+    const { rows } = JSON.parse(readFileSync(file.path,'utf8'));
+    if (!Array.isArray(rows) || rows.some(row => typeof row.hash !== 'string' || typeof row.text !== 'string')) fail('This report has no localization table.');
+    toolTable = {id,rows};
+  }
+  const term = query.trim().toLowerCase();
+  const matches = term ? toolTable.rows.filter(row => row.hash.includes(term) || row.text.toLowerCase().includes(term)) : toolTable.rows;
+  return {total:matches.length, rows:matches.slice(offset,offset+50)};
+}
+
+async function runTool({ kind, archive, entry, path, index, roads }) {
+  if (!toolKinds.has(kind)) fail('Unknown tool.');
+  if (index != null && (!Number.isSafeInteger(index) || index < 0)) fail('Invalid stream selection.');
+  const limit = 128*1024*1024;
+  let bytes, systemSize, label, inputPath;
+  if (path) {
+    inputPath = getPath(path);
+    const stat=statSync(inputPath);
+    if (!stat.isFile() || !stat.size || !hasByteRange(readAvailableRanges(inputPath,stat.size),0,stat.size)) {
+      fail('Choose a complete local file.');
+    }
+    if (kind === 'movie') return openMovie(inputPath,0,stat.size);
+    if (stat.size > limit) fail('Choose a decoded resource no larger than 128 MiB.');
+    bytes=readFileSync(inputPath);
+    label=basename(inputPath);
+    systemSize=bytes.length;
+  } else {
+    const {state,info}=infoFor(archive);
+    const row=rowFor(info,String(entry));
+    if (row.pool || row.shader || row.bvh || row.kind==='archive') fail('Select a file entry or choose a decoded file.');
+    inputPath=info.archive.path;
+    label=describeRow(row,state).name.split('/').at(-1);
+    if (kind==='movie') {
+      if (row.crypto || row.chunks || row.size>row.stored) fail('Extract the movie and open the decoded file.');
+      closeSync(openVerifiedArchiveFile(info.archive));
+      return openMovie(inputPath,info.archive.start+row.offset,row.size);
+    }
+    if (row.size>limit) fail('Choose a decoded resource no larger than 128 MiB.');
+    bytes=decodePayload(state.game,info.archive,row);
+    systemSize=row.systemSize ?? bytes.length;
+  }
+  if (kind==='terrain') {
+    const map=previewResource(bytes);
+    if (map?.type!=='heightmap') fail('Choose an MHIU heightmap.');
+    return {...map,title:label,bounds:Array.from({length:6},(_,i)=>bytes.readFloatLE(12+4*i)),
+      sourceWidth:bytes.readUInt16LE(6),sourceHeight:bytes.readUInt16LE(8)};
+  }
+  return buildAssetPreview({kind,archive:inputPath,name:label,system_size:systemSize,index,detail:roads===true ? 1 : null},bytes);
+}
+
+export function prepareArchiveReport(key, kind) {
+  const {state,info}=infoFor(key);
+  if (!['entries','shaders'].includes(kind)) fail('Unknown archive report.');
+  const {archive}=info;
+  const rows=archive.rows.filter(row => kind!=='shaders' || row.shader).map(row=>describeRow(row,state));
+  if (kind==='shaders' && !rows.length) fail('Open the complete shaders.rpf and select it in Archives.');
+  const verify = () => {
+    if (archive.pool) verifyPool(archive);
+    else if (archive.identity) closeSync(openVerifiedArchiveFile(archive));
+    else for (const row of archive.rows) row.bvh?.verify();
+  };
+  verify();
+  const data = Buffer.from(JSON.stringify({archive:archive.name,signature:archive.headerSignature??null,
+    entries:rows.length,rows},null,2)+'\n');
+  return {name:safeFilename(archive.name)+'.'+kind+'.json',sources:inputFiles(state),length:data.length,verify,read:()=>data};
+}
+
 async function previewEntry(url) {
     stopMovie();
     const { state, info } = infoFor(url.searchParams.get('archive'));
     const row = rowFor(info, url.searchParams.get('entry'));
+    if (row.bvh) {
+      row.bvh.verify();
+      return row.bvh.preview();
+    }
+    if (row.shader) {
+      closeSync(openVerifiedArchiveFile(info.archive));
+      return row.shader.preview();
+    }
     if (info.archive.pool) {
       verifyPool(info.archive);
       const detail=url.searchParams.get('detail'), slice=url.searchParams.get('slice');
@@ -444,16 +593,16 @@ async function previewEntry(url) {
 }
 
 function inputFiles(state) {
-  return [state.executable,...[...state.archives.values()].map(item=>item.archive.path)].filter(Boolean);
+  return [...new Set([state.executable,...[...state.archives.values()]
+    .flatMap(({archive})=>[archive.path,...(archive.bvhSources??[])])])].filter(Boolean);
 }
 
 export function preparePreviewExport(id, name) {
-  const state = requireWorkspace();
   const file = assetPreviewFile(id,name);
   if (!file) fail('Open the asset preview again before exporting.');
   const original = statSync(file.path);
   const length = original.size;
-  return { name, length, sources:[...inputFiles(state),file.path],
+  return { name, length, sources:[...(workspace ? inputFiles(workspace) : []),...file.sources,file.path],
     verify:() => {
       const current=statSync(file.path);
       if (current.size!==original.size || current.mtimeMs!==original.mtimeMs || current.ino!==original.ino) {
@@ -466,6 +615,25 @@ export function preparePreviewExport(id, name) {
 export function prepareExport(archive, entry, stored, mip) {
   const { state, info } = infoFor(archive);
   const row = rowFor(info, String(entry));
+  if (row.bvh) {
+    if (mip!==undefined) fail('Mip selection is available for texture pools.');
+    const bvh=row.bvh;
+    const name=safeFilename(bvh.name);
+    return {name:stored ? name.replace(/\.zip$/,'.graphics.zlib') : name,
+      length:stored ? bvh.stored : bvh.size,sources:inputFiles(state),verify:bvh.verify,
+      read:stored ? bvh.packed : bvh.read};
+  }
+  if (row.shader) {
+    if (mip!==undefined) fail('Mip selection is available for texture pools.');
+    const shader = row.shader;
+    const raw = stored === true;
+    return {
+      name:safeFilename(shader.name)+(raw ? '.stored' : ''),
+      length:raw ? shader.stored : shader.size, sources:inputFiles(state),
+      verify:()=>closeSync(openVerifiedArchiveFile(info.archive)),
+      read:raw && shader.packed ? shader.packed : shader.read,
+    };
+  }
   if (info.archive.pool) {
     verifyPool(info.archive);
     if (stored) fail('Texture pools export the selected image as DDS.');

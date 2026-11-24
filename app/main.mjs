@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { dispatch, prepareExport, preparePreviewExport } from './workspace.mjs';
+import { dispatch, prepareArchiveReport, prepareExport, preparePreviewExport } from './workspace.mjs';
 import { assetPreviewFile, clearAssetPreviews } from './asset-preview.mjs';
 import { withFbxExport } from './fbx-export.mjs';
 import { runCli } from './cli.mjs';
@@ -143,6 +143,7 @@ async function choosePath(kind) {
       filters:[{name:'RPF9 archives',extensions:['rpf','rpf9']}] },
     pool: { title:'Open texture pool', properties:['openFile'], filters:[{name:'Texture pools',extensions:['ttpf']}] },
     folder: { title:'Open folder of RPF9 archives', properties:['openDirectory'] },
+    asset: { title:'Choose a decoded resource or media file', properties:['openFile'] },
   };
   if (!Object.hasOwn(choices,kind)) throw new Error('Invalid file picker.');
   const result = await dialog.showOpenDialog(window,choices[kind]);
@@ -188,6 +189,8 @@ export const ready = app.whenReady().then(() => {
   handle('opensix:request', dispatch);
   handle('opensix:save', save);
   handle('opensix:save-preview',savePreview);
+  handle('opensix:save-report', (archive, kind) => saveFile(prepareArchiveReport(archive, kind), 'Save archive index',
+    [{name:'JSON',extensions:['json']} ]));
   handle('opensix:choose', choosePath);
 });
 

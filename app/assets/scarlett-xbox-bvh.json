@@ -1,0 +1,186 @@
+{
+  "name": "id_10b_wtrplnt_bld00_details",
+  "coreArchive": "pack/core_bvh4/core_bvh4.rpf",
+  "coreLength": 8297921520,
+  "system": {
+    "offset": 1173495824,
+    "length": 65,
+    "sha256": "6079e640ae556fbdc3c7e51cb92326a03bb7331d8929bf558909b650111b104c"
+  },
+  "graphics": {
+    "offset": 1173495904,
+    "length": 76126,
+    "sha256": "2e776e979d32bad1ca2faf1596454d8d663097a7cb40a09ce8cb566d2e47ae7c"
+  },
+  "descriptorBytes": 208,
+  "graphicsBytes": 1376256,
+  "bvhHeaderOffset": 256,
+  "layoutCrc32": 417233498,
+  "drawable": {
+    "path": "levels.rpf",
+    "directory": {
+      "offset": 11259469824,
+      "length": 624320,
+      "extent": 680540896,
+      "sha256": "f786b9bc2008d13bd4efe85d666218f3ab4d03b86618ad2f66d9f1a8c85d8759"
+    },
+    "row": 387,
+    "hash64": "1fb57671631c1c34",
+    "stored": {
+      "offset": 11412123648,
+      "length": 391056,
+      "sha256": "cc180ff4af5575fd06b3b4c198164e9d2c0dfbfbb672b7df56cad4fa2c885377"
+    },
+    "decodedSha256": "1ef7745e8c066b11116703a6f7e518d366736523d87311892e46c834f61d13d5",
+    "systemSize": 62064,
+    "drawableOffset": 0,
+    "lod": 0,
+    "model": 0
+  },
+  "geometry": [
+    {
+      "ordinal": 0,
+      "shader": 0,
+      "renderBucket": 0,
+      "vertices": 432,
+      "triangles": 240,
+      "positionSha256": "debb5e3d5153a989fa39076eb65cef449e6f9841d831985e03b7fcc70ebe4ad3",
+      "indexSha256": "b7e6dfbf74cf37a8cdc142556dcc5849a7b3144eb413ae30fa0cda6aafa29d81"
+    },
+    {
+      "ordinal": 1,
+      "shader": 1,
+      "renderBucket": 0,
+      "vertices": 3058,
+      "triangles": 2998,
+      "positionSha256": "d4b9db0c6a3a316ce171cf71526795bccee9e48301cb066ffe2bbf37392f4020",
+      "indexSha256": "f38bf97ae04f22a7fa809a00061decd395fe74b5f595f10498709b043385e699"
+    },
+    {
+      "ordinal": 2,
+      "shader": 2,
+      "renderBucket": 0,
+      "vertices": 508,
+      "triangles": 776,
+      "positionSha256": "bb2a4fd10734134bd94eb2810d2b5a0b57ef1ac66dc0cb222133ace2118cabe2",
+      "indexSha256": "4c7f7435c74969d14432d0f8d2677cc6469d82b9710f1d6d2ead6b44e29215bf"
+    },
+    {
+      "ordinal": 3,
+      "shader": 3,
+      "renderBucket": 0,
+      "vertices": 20,
+      "triangles": 10,
+      "positionSha256": "ee7de6f0bff514a48ba278e4924b3f5d10d8fa97ea002224fd74002c1ed92be7",
+      "indexSha256": "acd7c08baf580c04effbe6147a5b6fa4a0b8e59606eb150c51ab0ca443b543b7"
+    },
+    {
+      "ordinal": 4,
+      "shader": 4,
+      "renderBucket": 0,
+      "vertices": 226,
+      "triangles": 288,
+      "positionSha256": "91d24f1f3b54c6461ab19be587c56747513b496faa79c2888e990f4fdafe7da9",
+      "indexSha256": "0599a41c84d8089223d483f254372cb05bcf69cba56bf6cc338157428a2bb993"
+    },
+    {
+      "ordinal": 5,
+      "shader": 5,
+      "renderBucket": 0,
+      "vertices": 212,
+      "triangles": 122,
+      "positionSha256": "3ad91119c1ebfa3a1466d478bc7e3e0cb95b6caf99138424118e78ee3946cbd4",
+      "indexSha256": "037b2850a37b6a7b821d9e8da0e1b43bae127ecf4596cd9518e41b173dac6e98"
+    },
+    {
+      "ordinal": 6,
+      "shader": 6,
+      "renderBucket": 0,
+      "vertices": 344,
+      "triangles": 232,
+      "positionSha256": "569c4b82d08aa5efb12811c4bc9c98c9ffdcf7575707c4092537c77304081b7c",
+      "indexSha256": "9328d2ba9d18d13c8575debec5549d04ef60e18b26629876e2851fcf572edb26"
+    },
+    {
+      "ordinal": 7,
+      "shader": 7,
+      "renderBucket": 0,
+      "vertices": 8868,
+      "triangles": 8346,
+      "positionSha256": "49cb9e19f89dd2fc8ae1d4d8d8144bd279dc0120426425755ff42b60f6fef2c8",
+      "indexSha256": "6b987636aefe8b203513c8120846f60683520fe3998ea59723c0688b7abd2b9a"
+    },
+    {
+      "ordinal": 8,
+      "shader": 8,
+      "renderBucket": 0,
+      "vertices": 1582,
+      "triangles": 1104,
+      "positionSha256": "b36203c4336eb92536f56e9c5eb2063ca85bf7a336f8218866163d9cf22cee94",
+      "indexSha256": "963e1cde8ba0e81417f7afab0d026183feaccc1a96ddebcf51bee751e4c8e11e"
+    },
+    {
+      "ordinal": 9,
+      "shader": 9,
+      "renderBucket": 0,
+      "vertices": 484,
+      "triangles": 460,
+      "positionSha256": "b4ca6cc61eb76ace7dc6b907209ea1a91f1491b4cbc8ad380ddf5bd195381dca",
+      "indexSha256": "70b09ea4545038e65d663f50644126bcfa114c00c3a211ca744077870b378958"
+    },
+    {
+      "ordinal": 10,
+      "shader": 10,
+      "renderBucket": 0,
+      "vertices": 2864,
+      "triangles": 2710,
+      "positionSha256": "8553a1cb9ed58f86e6c50009f83bb5129ccb7527635306b4935ea866604834ac",
+      "indexSha256": "14ea89e467b891c8369669ff813e4edc5f1b6e07772312f866c955093a1a8c20"
+    },
+    {
+      "ordinal": 11,
+      "shader": 11,
+      "renderBucket": 0,
+      "vertices": 144,
+      "triangles": 100,
+      "positionSha256": "95419cfb340d002a6156a4402b1ca6fbf98f3f963beef195641deb3eeacc2336",
+      "indexSha256": "e8d69da60e0ac807e6a80b4ec5e6d7379e242096b96c0c70e20a805c575cd6c4"
+    },
+    {
+      "ordinal": 12,
+      "shader": 12,
+      "renderBucket": 0,
+      "vertices": 2430,
+      "triangles": 1832,
+      "positionSha256": "643ad003b868667d10a3be13b3d7cde4f8b4d3d04d156667b9a1506c9d15bd7f",
+      "indexSha256": "1e28f58311da9e3e1c1c6ae616bc2416450025c3800e85b37231f1e8c34c51c8"
+    },
+    {
+      "ordinal": 13,
+      "shader": 13,
+      "renderBucket": 0,
+      "vertices": 2184,
+      "triangles": 2060,
+      "positionSha256": "76e4b4b34e0d9bdf8ae1ab56bd1eac2f2576d9d3e5a51e7525dec3bfa1576e93",
+      "indexSha256": "21caa4382a5f13867ee9c2b4317401111931972045f287bd76377c04f87b873e"
+    },
+    {
+      "ordinal": 23,
+      "shader": 23,
+      "renderBucket": 3,
+      "vertices": 1064,
+      "triangles": 908,
+      "positionSha256": "47efa6a09fe6fb9eadc4f2b83438b49113bc8778b89e08201b73d37a3d330bfa",
+      "indexSha256": "2024d71c70be01c2d1b1ee7ea82d53d86f00052cea83eba1bae9dce466754718"
+    },
+    {
+      "ordinal": 24,
+      "shader": 24,
+      "renderBucket": 3,
+      "vertices": 8,
+      "triangles": 4,
+      "positionSha256": "7557a72690e877586d4ff0f1ccb34211cd3bedbcbd277c61508e317702d196fe",
+      "indexSha256": "3b954c48ebdf12345811de7e8c6989918fa6b90f0feefe5130b6e4ed9a258c36"
+    }
+  ]
+}

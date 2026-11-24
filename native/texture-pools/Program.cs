@@ -13,6 +13,7 @@ try
         "poolIndex" => Index(request.Archive),
         "poolTexture" => Preview(request, folder),
         "poolDds" => Export(request, folder),
+        "gpuBvhMesh" => GpuBvhMesh(request, folder),
         "wardrobe" => Wardrobe(request, folder),
         _ => throw new ArgumentException("Unknown texture pool request.")
     };
@@ -33,6 +34,10 @@ static object Index(string path) => new
         id = texture.Index, name = texture.Name, key = texture.AssetKey.ToString("x16"),
         size = texture.DdsSize, stored = texture.StoredSize, offset = texture.VirtualOffset,
         format = texture.Format, width = texture.Width, height = texture.Height, shape = texture.Shape,
+        nativeMode = texture.NativeMode, tileMode = texture.TileMode, auxiliaryMapping = texture.AuxiliaryMapping,
+        usesBcpack = texture.UsesBcpack, baseMip = texture.BaseMipLevel, mips = texture.Mips, sourceMips = texture.SourceMips,
+        keywords = texture.UsesBcpack ? new[] { $"native mode {texture.NativeMode}", "BCPack" }
+            : new[] { $"native mode {texture.NativeMode}" },
         exportable = texture.CanExtract,
     }),
 };
@@ -46,7 +51,7 @@ static object Preview(PoolRequest request, string folder)
     if (request.Detail.HasValue && (mip < texture.BaseMipLevel || mip >= texture.BaseMipLevel + texture.Mips))
         throw new ArgumentOutOfRangeException(nameof(request.Detail));
     string? file = null;
-    string? note = texture.Limitation;
+    string? note = texture.Limitation ?? texture.PreviewNote;
     string? blockedMip = null;
     if (texture.CanExtract)
     {
@@ -91,6 +96,45 @@ static object Export(PoolRequest request, string folder)
     return new {type = "file", file};
 }
 
+static object GpuBvhMesh(PoolRequest request, string folder)
+{
+    byte[] input = File.ReadAllBytes(Path.Combine(folder, "entry.bin"));
+    if (request.SystemSize is not int systemSize || systemSize <= 0 || systemSize >= input.Length ||
+        request.DrawableOffset is not int drawableOffset || drawableOffset < 0 ||
+        request.Index is not int modelIndex || modelIndex < 0 ||
+        request.Detail is not int lod || lod < 0 ||
+        request.Ordinals is not { Length: > 0 } ordinals)
+        throw new InvalidDataException("Missing Xbox GPU BVH mesh selection.");
+
+    var model = RageModelDecoder.Decode(input.AsSpan(0, systemSize), input.AsSpan(systemSize), drawableOffset, lod)
+        ?? throw new InvalidDataException("The matching drawable could not be decoded.");
+    var modelKey = modelIndex.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    var meshes = model.Meshes.Where(mesh => mesh.Name.Split('_').ElementAtOrDefault(1) == modelKey).ToArray();
+    return new
+    {
+        type = "gpuBvhMesh",
+        geometry = ordinals.Select(ordinal =>
+        {
+            if ((uint)ordinal >= (uint)meshes.Length)
+                throw new InvalidDataException("The matching drawable is missing an expected geometry group.");
+            var mesh = meshes[ordinal];
+            using var vertices = new MemoryStream(checked(mesh.Positions.Count * 12));
+            using var vertexWriter = new BinaryWriter(vertices);
+            foreach (var point in mesh.Positions)
+            {
+                vertexWriter.Write(point.X);
+                vertexWriter.Write(point.Y);
+                vertexWriter.Write(point.Z);
+            }
+            using var indices = new MemoryStream(checked(mesh.Indices.Count * 4));
+            using var indexWriter = new BinaryWriter(indices);
+            foreach (int index in mesh.Indices)
+                indexWriter.Write(index);
+            return new { ordinal, positions = vertices.ToArray(), indices = indices.ToArray() };
+        }).ToArray()
+    };
+}
+
 static object Wardrobe(PoolRequest request, string folder)
 {
     var catalog = RageWardrobeCatalog.Decode(File.ReadAllBytes(Path.Combine(folder, "entry.bin")));
@@ -116,4 +160,5 @@ static object Wardrobe(PoolRequest request, string folder)
 static TtpfTextureInfo Texture(PoolRequest request) => TtpfReader.Inspect(request.Archive).Textures
     .FirstOrDefault(texture => texture.Index == request.Index) ?? throw new InvalidDataException("Texture pool entry is missing.");
 
-internal sealed record PoolRequest(string Kind, string Archive, int? Index, int? Detail, int? Slice);
+internal sealed record PoolRequest(string Kind, string Archive, int? Index, int? Detail, int? Slice,
+    int? SystemSize, int? DrawableOffset, int[]? Ordinals);
