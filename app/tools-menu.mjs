@@ -229,6 +229,19 @@ export function setupTools({ current, openPool, openFound, notify }) {
       else if (name==='open') el('open').click();
       else if (name==='names') el('import-names').click();
       else if (name==='pool') await openPool();
+      else if (name==='batch') {
+        const {archive,query,scope,filter}=current();
+        notify('Preparing extraction…');
+        const result=await window.opensix.saveBatch({archive,query,scope,filter});
+        notify(result ? ('Saved '+result.saved+' files to '+result.folder+'.'+(result.failed?' '+result.failed+' entries could not be extracted. See extraction-report.json.':'')) : '',Boolean(result?.failed));
+      }
+      else if (name==='create') {
+        const folder=await window.opensix.choose('archive-files');
+        if (folder) {
+          const saved=await window.opensix.createArchive(folder);
+          if (saved) notify('Created '+saved+'.');
+        }
+      }
       else {
         const saved=await window.opensix.saveReport(current().archive,name);
         if (saved) notify('Saved '+saved+'.');

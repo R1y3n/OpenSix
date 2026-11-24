@@ -480,7 +480,7 @@ el('choose-pool').addEventListener('click', async () => {
   finally { trigger.disabled=false; }
 });
 setupTools({
-  current:()=>({archive:model.active,entry:model.selection}), openPool, notify:message,
+  current:()=>({archive:model.active,entry:model.selection,query:el('search').value,scope:model.scope,filter:el('filter').value}), openPool, notify:message,
   async openFound({archive,entry},query) {
     freshState(archive);
     el('search').value=query;

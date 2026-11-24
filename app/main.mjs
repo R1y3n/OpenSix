@@ -1,12 +1,12 @@
 
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session } from 'electron';
-import { createReadStream, createWriteStream, existsSync, readFileSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
+import { constants as fsConstants, copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { dispatch, prepareArchiveReport, prepareExport, preparePreviewExport } from './workspace.mjs';
+import { dispatch, prepareArchiveReport, prepareExport, prepareNewArchive, preparePreviewExport, scanEntries } from './workspace.mjs';
 import { assetPreviewFile, clearAssetPreviews } from './asset-preview.mjs';
 import { withFbxExport } from './fbx-export.mjs';
 import { runCli } from './cli.mjs';
@@ -101,7 +101,10 @@ async function saveFile(file, title, filters) {
     properties: ['showOverwriteConfirmation'],
   });
   if (picked.canceled || !picked.filePath) return null;
-  const destination = picked.filePath;
+  return saveTo(file,picked.filePath);
+}
+
+async function saveTo(file,destination) {
   if (!isAbsolute(destination) || destination.startsWith('\\\\') ||
       file.sources.some(source => matchesSource(destination, source))) {
     throw new Error('Choose a local destination other than an open archive or the game executable.');
@@ -127,12 +130,47 @@ async function saveFile(file, title, filters) {
     if (file.sources.some(source => matchesSource(destination, source))) {
       throw new Error('The destination now points to an open archive or the game executable.');
     }
-    renameSync(temp, destination);
+    if (file.mustBeNew) {
+      try { linkSync(temp,destination); }
+      catch(error) {
+        if (!['ENOSYS','ENOTSUP','EPERM','EACCES'].includes(error.code)) throw error;
+        copyFileSync(temp,destination,fsConstants.COPYFILE_EXCL);
+      }
+    } else renameSync(temp, destination);
     return basename(destination);
   } finally {
     exporting.delete(key);
     rmSync(temp, { force: true });
   }
+}
+
+async function saveBatch({archive,query,scope,filter}) {
+  if (typeof query!=='string' || typeof scope!=='string' || !['all','resolved','unresolved'].includes(filter)) {
+    throw new Error('Invalid extraction filter.');
+  }
+  const rows=[...scanEntries(archive,query,{scope,filter})];
+  if (!rows.length) throw new Error('No entries match the current filter.');
+  const picked=await dialog.showOpenDialog(window,{title:'Choose where to extract '+rows.length+' matching entries',
+    properties:['openDirectory','createDirectory']});
+  if (picked.canceled || !picked.filePaths[0]) return null;
+  const target=realpathSync(picked.filePaths[0]);
+  if (!isAbsolute(target) || target.startsWith('\\\\')) throw new Error('Choose a local extraction folder.');
+  const folder=mkdtempSync(join(target,'OpenSix-'));
+  const result={saved:0,failed:0,folder};
+  const entries=[];
+  for (const row of rows) {
+    try {
+      const file=await prepareExport(archive,row.id,false);
+      const output=await saveTo({...file,mustBeNew:true},join(folder,row.id+'-'+file.name));
+      entries.push({id:row.id,archivePath:row.name,output,bytes:file.length});
+      result.saved++;
+    } catch(error) {
+      entries.push({id:row.id,archivePath:row.name,error:error.message});
+      result.failed++;
+    }
+  }
+  writeFileSync(join(folder,'extraction-report.json'),JSON.stringify(entries,null,2)+'\n',{flag:'wx'});
+  return result;
 }
 
 async function choosePath(kind) {
@@ -144,6 +182,7 @@ async function choosePath(kind) {
     pool: { title:'Open texture pool', properties:['openFile'], filters:[{name:'Texture pools',extensions:['ttpf']}] },
     folder: { title:'Open folder of RPF9 archives', properties:['openDirectory'] },
     asset: { title:'Choose a decoded resource or media file', properties:['openFile'] },
+    'archive-files': { title:'Choose files for a new unsigned RPF9', properties:['openDirectory'] },
   };
   if (!Object.hasOwn(choices,kind)) throw new Error('Invalid file picker.');
   const result = await dialog.showOpenDialog(window,choices[kind]);
@@ -191,6 +230,9 @@ export const ready = app.whenReady().then(() => {
   handle('opensix:save-preview',savePreview);
   handle('opensix:save-report', (archive, kind) => saveFile(prepareArchiveReport(archive, kind), 'Save archive index',
     [{name:'JSON',extensions:['json']} ]));
+  handle('opensix:create-archive', path => saveFile(prepareNewArchive(path),'Create unsigned RPF9',
+    [{name:'RPF9 archive',extensions:['rpf']} ]));
+  handle('opensix:save-batch',saveBatch);
   handle('opensix:choose', choosePath);
 });
 

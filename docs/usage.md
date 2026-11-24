@@ -4,11 +4,21 @@
 
 Use **Archive** to open files, import paths, search open archives, and export the selected archive index. When a complete supported `shaders.rpf` is selected, **Export shader index** writes the decoded records and their searchable names and links.
 
+**Archive → Extract matching files** uses the current search, folder and name filter. It creates a new output folder with the decoded files and a report that lists any entries the decoder could not extract.
+
 **World**, **Assets**, and **Data** open separate tool dialogs. Select a file in the archive browser first and choose **Use selected entry**, or use **Open decoded file** to work with an extracted resource. For a resource with separate system and graphics pages, use the corresponding archive entry so OpenSix can read the layout from its directory record.
 
 - **World** opens terrain, placement, navigation and timecycle tools. Navigation tiles can be filtered to road polygons and exported as GLB, FBX or JSON.
-- **Assets** opens handling, groom, cloth and particle reports, plus audio-bank and movie playback. Bink and XMA2 playback use the helpers documented below.
+- **Assets** opens handling, groom, cloth and particle reports, plus audio-bank and movie playback. For Bink 2, the built-in player supports video, stepping and seeking. **Bink audio tracks** plays and saves supported DCT tracks as WAV. See below for the Bink 1 and synchronized Bink audio helper.
 - **Data** opens the localization search, typed PSIN inspection and script XML extraction. Localization CSV preserves game text and quotes spreadsheet formula prefixes as literal text.
+
+## Authoring and conversion
+
+Open an archive with the matching executable, then choose **Archive → Create unsigned RPF9**. Pick a folder of files and a new output path. The new archive stores the files and their relative paths. Reopen it in OpenSix to browse and extract them. This writer uses ordinary file records and a path manifest for OpenSix. Retail signing and resource-aware replacement still require a validated writer for those formats.
+
+**World → Export GTA V map (YMAP)** takes a decoded placement entry or a placement JSON report. It preserves archetype hashes and transforms. The target game needs the referenced archetypes and models. The **Assets** menu converts local OBJ to YDR or YBN, and DDS to YTD. **Data → Create GTA V archetypes (YTYP)** accepts an archetype JSON document using the [6to5m converter schema](https://github.com/DesignWithTommy/6to5m/blob/5d62e745bb4413d7f21923b23c713b6651728868/src/gta5/meta.rs). These tools write GTA V resources for use in a mod project.
+
+For grooms, select the archive entry or open a `.osgroom` bundle with **Assets → Hair and fur guides**. The bundle preserves the original decoded system and graphics pages. The 3D view displays ribbons along the guide points. OBJ export stores the guides as lines.
 
 Download [OpenSix.exe](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. Choose the executable and archive from the supported Scarlett build. OpenSix reads the executable to get the archive format tables, and the game stays closed.
 

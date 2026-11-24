@@ -23,6 +23,9 @@ OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Ope
 - **Inspect more resource types.** Read vehicle handling, particle rules and keyframes, groom guides, and cloth constraints. Save hair guides and cloth constraints as OBJ lines. Open a decoded audio bank or Bink movie from the **Assets** menu.
 - **Search localization tables.** Search a decoded table by label hash or text and save CSV or JSON. Read typed PSIN fields and export recognized script documents as XML.
 - **Inspect shader groups and Xbox GPU BVH data.** Browse decoded SGD5 members and effect links in a complete supported `shaders.rpf`. Preview the geometry for the verified Xbox GPU BVH sample and export it with its compressed BVH, geometry buffers, transforms and address descriptors.
+- **Create unsigned RPF9 archives.** Pack a folder of files, then reopen it with the original relative paths in OpenSix.
+- **Convert assets for GTA V mods.** Save YMAP placements, YDR drawables, YBN collision files, YTD textures, and YTYP archetypes from supported inputs.
+- **Play Bink 2 video and export audio.** Step and seek with the built-in decoder, and save supported DCT tracks as WAV.
 
 ## Getting started
 
@@ -40,7 +43,7 @@ The diner scene above and the “What the fuck is quinoa” image below are 512 
 
 ## Compatibility
 
-OpenSix supports one GTA VI Xbox Series X|S (Scarlett) build. The [compatibility notes](docs/compatibility.md) give the executable fingerprint, supported formats, and known limits. Archives are read-only. Some names, models, materials, and storage formats are still unresolved.
+OpenSix supports one GTA VI Xbox Series X|S (Scarlett) build. The [compatibility notes](docs/compatibility.md) give the executable fingerprint, supported formats, and known limits. Source archives open read-only. Some names, models, materials, and storage formats remain unresolved.
 
 ## Source and credits
 

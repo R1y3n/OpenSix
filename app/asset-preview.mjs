@@ -13,6 +13,8 @@ const formats = new Map([
   ['.glb','model/gltf-binary'],['.png','image/png'],['.opus','audio/ogg'],
   ['.wav','audio/wav'],['.xma','application/octet-stream'],['.json','application/json'],['.dds','image/vnd-ms.dds'],
   ['.csv','text/csv'],['.xml','application/xml'],['.obj','text/plain'],
+  ['.osgroom','application/octet-stream'],
+  ...['.ymap','.ytyp','.ydr','.ybn','.ytd'].map(ext=>[ext,'application/octet-stream']),
 ]);
 
 export function resourceKind(extension, bytes) {
@@ -114,6 +116,12 @@ export function previewMeshGlb(data, details) {
     rmSync(folder,{recursive:true,force:true});
     throw error;
   }
+}
+
+export async function keepLocalExport(sources, generate) {
+  const folder=mkdtempSync(join(tmpdir(),'opensix-convert-'));
+  try { return keepPreview(folder,await generate(folder),sources); }
+  catch(error) { rmSync(folder,{recursive:true,force:true}); throw error; }
 }
 
 function poolEnvironment() {

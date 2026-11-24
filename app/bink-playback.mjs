@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync, readSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const releaseHelperHash='1c0d56b22ed2600c9bf76fe1efc2463eaa19cd24015f665f2cec1f9d5b6a697e';
 let playback;
@@ -19,16 +20,24 @@ export function stopMovie(id) {
 
 export async function openMovie(path, offset, length) {
   const portable=process.env.PORTABLE_EXECUTABLE_DIR;
-  const helper=[process.env.OPENSIX_BINK_PLAYER,portable && join(portable,'bink-player.exe')]
+  const external=[process.env.OPENSIX_BINK_PLAYER,portable && join(portable,'bink-player.exe')]
     .find(path=>path && isAbsolute(path) && existsSync(path));
-  if (!helper) {
-    throw new Error('Place the rpf9-explorer v1.3 bink-player.exe beside OpenSix.exe to preview this movie.');
+  const magic=Buffer.alloc(3);
+  const fd=openSync(path,'r');
+  try {
+    if (readSync(fd,magic,0,magic.length,offset)!==3 || !isBink(magic)) throw new Error('Choose a complete Bink movie.');
+  } finally { closeSync(fd); }
+  if (!external && magic.toString('ascii')==='BIK') {
+    throw new Error('Bink 1 playback needs the rpf9-explorer v1.3 bink-player.exe beside OpenSix.exe.');
   }
-  if (createHash('sha256').update(readFileSync(helper)).digest('hex')!==releaseHelperHash) {
+  if (external && createHash('sha256').update(readFileSync(external)).digest('hex')!==releaseHelperHash) {
     throw new Error('The Bink player does not match the verified rpf9-explorer v1.3 helper.');
   }
+  const builtIn=process.resourcesPath && existsSync(join(process.resourcesPath,'opensix-preview.exe'))
+    ? join(process.resourcesPath,'opensix-preview.exe') : fileURLToPath(new URL('./worker/opensix-preview.exe',import.meta.url));
+  const source=[path,String(offset),String(length)];
   stopMovie();
-  const child=spawn(helper,[path,String(offset),String(length),'640'],{windowsHide:true});
+  const child=spawn(external ?? builtIn,external ? [...source,'640'] : ['--bink-play',...source],{windowsHide:true});
   const state={child,id:randomBytes(16).toString('hex'),version:0,number:1,playing:false,ended:false};
   playback=state;
   return new Promise((resolve,reject)=>{

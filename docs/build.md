@@ -23,6 +23,8 @@ npm --prefix app start
 
 The build checks out the pinned SixNG revision under `.deps/sixng`, applies the preview API patch, and builds the Rust worker with Cargo's lockfile. It builds the FBX converter from the pinned Assimp checkout under `.deps/assimp`, applies a fix for multi-layer UV data, and bundles the license notices. It installs the locked desktop dependencies, downloads the matching Electron runtime, and generates the viewer bundle and Windows icons.
 
+The same build pins [bink2-decoder](https://github.com/codingkoala/bink2-decoder/tree/2e709c23023d0af75eead5e93cdeb4e5c19f4128) for the preview worker and compiles [6to5m](https://github.com/DesignWithTommy/6to5m/tree/5d62e745bb4413d7f21923b23c713b6651728868) as the `6ixpack` conversion worker. Their licenses accompany the binary. The Bink dependency is Apache-2.0 and 6to5m is GPL-3.0.
+
 The texture-pool worker uses the pinned rpf9-explorer checkout under `.deps/rpf9-explorer`. The build publishes it as a self-contained Windows executable.
 
 The texture-pool worker loads a BCPack library built from VIctory revision `d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989`. The portable EXE includes this library and opens it automatically. A source checkout can supply the verified BCPack table file. A portable build reads the table file from beside `OpenSix.exe` or from the absolute path in `OPENSIX_BCPACK_TABLES`. The table file has its own terms. See [VIctory's asset policy](https://github.com/Marvisak/VIctory/blob/d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989/docs/asset-policy.md).

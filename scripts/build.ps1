@@ -8,6 +8,8 @@ $decoder = Join-Path $root '.deps/sixng'
 $assimp = Join-Path $root '.deps/assimp'
 $explorer = Join-Path $root '.deps/rpf9-explorer'
 $victory = Join-Path $root '.deps/victory'
+$bink = Join-Path $root '.deps/bink2'
+$gta5Converter = Join-Path $root '.deps/6to5m'
 $poolBuild = Join-Path $root '.deps/pool-build'
 $fbxBuild = Join-Path $root '.deps/fbx-build'
 $app = Join-Path $root 'app'
@@ -30,6 +32,8 @@ Initialize-Dependency $decoder 'https://github.com/holdmysocks/SixNG.git' '08f1c
 Initialize-Dependency $assimp 'https://github.com/assimp/assimp.git' 'a79ff6bbce54d3e01186a918dc6374ed55317426'
 Initialize-Dependency $explorer 'https://github.com/breadbbbb/rpf9-explorer.git' 'af549336624fdabf7d1bb6f00b8783e7e1ef692e'
 Initialize-Dependency $victory 'https://github.com/Marvisak/VIctory.git' 'd2a4bae1f49533ef5cb512fd1b1ba1513f2e1989'
+Initialize-Dependency $bink 'https://github.com/codingkoala/bink2-decoder.git' '2e709c23023d0af75eead5e93cdeb4e5c19f4128'
+Initialize-Dependency $gta5Converter 'https://github.com/DesignWithTommy/6to5m.git' '5d62e745bb4413d7f21923b23c713b6651728868'
 
 function Apply-DependencyPatch($Path, $Patch) {
     $PSNativeCommandUseErrorActionPreference = $false
@@ -51,6 +55,7 @@ try {
     $env:RUSTFLAGS = ('{0} -C target-feature=+crt-static' -f $previousRustFlags).Trim()
     cargo build --locked --release --target $target --manifest-path (Join-Path $root 'native/preview/Cargo.toml')
     cargo build --locked --release --target $target --manifest-path (Join-Path $root 'native/bcpack/Cargo.toml')
+    cargo build --locked --release --target $target --manifest-path (Join-Path $gta5Converter 'Cargo.toml')
 } finally {
     $env:RUSTFLAGS = $previousRustFlags
 }
@@ -61,6 +66,10 @@ Copy-Item -LiteralPath (Join-Path $targetDir "$target/release/opensix-preview.ex
 $bcpackTargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $root 'native/bcpack/target' }
 Copy-Item -LiteralPath (Join-Path $bcpackTargetDir "$target/release/opensix_bcpack.dll") -Destination $worker -Force
 Copy-Item -LiteralPath (Join-Path $victory 'LICENSE') -Destination (Join-Path $worker 'VIctory.LICENSE.txt') -Force
+Copy-Item -LiteralPath (Join-Path $bink 'LICENSE') -Destination (Join-Path $worker 'Bink2.LICENSE.txt') -Force
+$converterTargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $gta5Converter 'target' }
+Copy-Item -LiteralPath (Join-Path $converterTargetDir "$target/release/6ixpack.exe") -Destination $worker -Force
+Copy-Item -LiteralPath (Join-Path $gta5Converter 'LICENSE') -Destination (Join-Path $worker '6to5m.LICENSE.txt') -Force
 dotnet publish (Join-Path $root 'native/texture-pools/OpenSix.Pools.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -o $poolBuild --nologo
 Copy-Item -LiteralPath (Join-Path $poolBuild 'opensix-pool.exe') -Destination $worker -Force
 $poolAssets = Get-Content -LiteralPath (Join-Path $root 'native/texture-pools/obj/project.assets.json') -Raw | ConvertFrom-Json -AsHashtable

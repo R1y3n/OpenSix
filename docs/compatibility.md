@@ -21,17 +21,19 @@ Check a local copy with `Get-FileHash -Algorithm SHA256 -LiteralPath '<path to e
 | `.zcd` | Inspect clip dictionaries, save JSON, and play supported clips on a compatible rig. |
 | `.ztd`, `.ttpf` | Browse textures and mips, save PNG, and export DDS from supported TTPF layouts. VIctory provides additional BC5, BC6H, and BC7 coverage with its table file. |
 | ADAT banks | Play and export supported Opus and PCM streams and music stems. Export XMA2 tracks or play them with FFmpeg. |
-| Bink / Bink 2 | Play and seek in supported movies with the local helper. |
+| Bink / Bink 2 | Built-in Bink 2 video playback and DCT audio track export. The local helper supports Bink 1 and synchronized audio. |
 | 0DRP v122 and PSIN | Inspect structure and section information and save JSON reports. |
 | MHIU, PNG, JPEG, GIF, WebP, WAV, Ogg | Preview supported heightmaps, images, and audio inside an archive. |
 | Tool menu | Cross-archive search and JSON index export, interactive MHIU terrain, typed PSIN, localization CSV and JSON, navigation GLB and FBX, map placement and weather reports, vehicle handling, groom and cloth OBJ, particle rules, and script XML for recognized records. |
 | SGD5 shader records | Browse shader groups, members and effect links from a complete supported `shaders.rpf`. Extract decoded DXBC blocks. |
 | Xbox GPU BVH | Inspect and export the verified sample tied to its matching drawable. Other BVH layouts need independent verification. |
+| Unsigned RPF9 | Build a new archive from a local folder of regular files and reopen it in OpenSix. |
+| GTA V resources | Convert placements to YMAP, OBJ to YDR or YBN, DDS to YTD and archetype JSON to YTYP. Target-game validation is separate from format verification. |
 
 ## Known limits
 
-- OpenSix reads archives in place. Archive editing, replacement, and repacking are outside the current feature set.
+- Source archives open read-only. The writer creates new unsigned archives with regular file records. Signed retail repacking and resource replacement remain open.
 - Paths are verified against the archive hashes. Two names in the local `common.rpf` audit, slots 243 and 316, remain unresolved. Their heightmap payloads can still be previewed and extracted.
 - Texture and material coverage varies by asset. Some variants have no renderable preview, and some TTPF layouts expose a reduced mip chain.
 - Model assembly uses the parts and texture sources you open. Wheel placement and wardrobe albedo and normal overrides are supported where the data can be resolved. Wardrobe palettes and some authored materials still need more coverage.
-- Supported XMA2 and Bink playback need their local helpers. The [usage guide](usage.md) lists the files and where to put them.
+- XMA2 playback, Bink 1 and synchronized Bink audio use the local helpers listed in the [usage guide](usage.md).

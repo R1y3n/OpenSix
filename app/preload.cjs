@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld('opensix', {
   choose: kind => ipcRenderer.invoke('opensix:choose',kind).then(unwrap),
   savePreview: (id,name) => ipcRenderer.invoke('opensix:save-preview',id,name).then(unwrap),
   saveReport: (archive,kind) => ipcRenderer.invoke('opensix:save-report',archive,kind).then(unwrap),
+  createArchive: path => ipcRenderer.invoke('opensix:create-archive',path).then(unwrap),
+  saveBatch: input => ipcRenderer.invoke('opensix:save-batch',input).then(unwrap),
 });

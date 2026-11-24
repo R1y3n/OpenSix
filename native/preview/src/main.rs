@@ -9,6 +9,7 @@ use std::{env, fs, io::Cursor, path::{Path, PathBuf}};
 
 mod inspect;
 mod tools;
+mod movie;
 
 #[derive(Deserialize)]
 struct Request {
@@ -332,6 +333,7 @@ fn run() -> Result<Value> {
     let request: Request = serde_json::from_slice(&fs::read(out.join("request.json"))?)?;
     let data = fs::read(out.join("entry.bin"))?;
     if request.kind=="bank" { return sound(&request,&data,&out); }
+    if request.kind=="binkAudio" { return movie::tracks(&data,request.index,&out); }
     if request.kind=="psin" { return inspect::psin(&data,&out); }
     if matches!(request.kind.as_str(),"toolText" | "toolPso" | "toolHandling" | "toolScript" | "toolTimecycle") {
         return tools::unpaged(&request.kind,&data,&out);
@@ -357,6 +359,9 @@ fn split_resource(mut data: Vec<u8>, size: usize) -> Result<Resource> {
 }
 
 fn main() -> Result<()> {
+    if env::args_os().nth(1).is_some_and(|arg|arg=="--bink-play") {
+        return movie::play(env::args_os().skip(2).collect());
+    }
     println!("{}",run()?);
     Ok(())
 }

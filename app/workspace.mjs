@@ -9,6 +9,8 @@ import { assetPreviewFile, buildAssetPreview, resourceKind } from './asset-previ
 import { isBink, movieCommand, movieFrame, openMovie, stopMovie } from './bink-playback.mjs';
 import { indexShaderRows } from './shader-index.mjs';
 import { isXboxBvhArchive, openXboxBvh } from './gpu-bvh.mjs';
+import { convertGta5, gta5Formats } from './gta5-convert.mjs';
+import { authoredPaths, prepareUnsignedRpf9 } from './unsigned-rpf9.mjs';
 
 const defaults = { executable: '', folder: '' };
 
@@ -16,7 +18,7 @@ const archiveExtensions = new Set(['.rpf', '.rpf9']);
 const modelExtensions = new Set(['zdr','zft','zdd']);
 const shaderDirectoryHash = '15f896951d3608eb45ca446c9d8198513076c0c9f2c3dd79981af8eb083a9af1';
 const toolKinds = new Set(['toolText','toolPso','toolHandling','toolScript','toolTimecycle',
-  'toolNavmesh','toolMap','toolGroom','toolCloth','toolParticles','terrain','bank','movie']);
+  'toolNavmesh','toolMap','toolGroom','toolCloth','toolParticles','terrain','bank','movie','binkAudio']);
 const expectedExtents = Object.entries(JSON.parse(readFileSync(new URL('./assets/scarlett-archive-extents.json', import.meta.url),'utf8')));
 
 let workspace = null;
@@ -57,6 +59,7 @@ function mount(state, path, parent = null, row = null) {
   }
   const archive = openArchive(state.game,path,
     parent ? parent.archive.start+row.offset : 0, row?.size, { availableRanges });
+  for (const name of authoredPaths(archive)) state.names.add(name,'OpenSix archive manifest');
   if (parent) archive.name = basename(state.names.resolve(row)?.path ?? fallbackName(row, state.game));
   const info = { key, archive, parent: parent?.key ?? null, row: row?.id ?? null };
   state.archives.set(key, info);
@@ -300,11 +303,13 @@ async function assembleWardrobe(input) {
   return assemble({parts,clip:input.clip});
 }
 
-export function* scanEntries(archive, search='') {
+export function* scanEntries(archive, search='', {scope='',filter='all'}={}) {
   const {state,info}=infoFor(archive);
   const query=search.trim().toLowerCase();
   for (const row of info.archive.rows) {
     const entry=describeRow(row,state);
+    if (scope && (!entry.resolved || !entry.name.startsWith(scope+'/'))) continue;
+    if (filter==='resolved' && !entry.resolved || filter==='unresolved' && entry.resolved) continue;
     if (!query || matchesSearch(entry,query)) yield entry;
   }
 }
@@ -482,7 +487,8 @@ function readToolTable({ id, query = '', offset = 0 }) {
 }
 
 async function runTool({ kind, archive, entry, path, index, roads }) {
-  if (!toolKinds.has(kind)) fail('Unknown tool.');
+  const conversion=gta5Formats.has(kind);
+  if (!toolKinds.has(kind) && !conversion) fail('Unknown tool.');
   if (index != null && (!Number.isSafeInteger(index) || index < 0)) fail('Invalid stream selection.');
   const limit = 128*1024*1024;
   let bytes, systemSize, label, inputPath;
@@ -494,13 +500,18 @@ async function runTool({ kind, archive, entry, path, index, roads }) {
     }
     if (kind === 'movie') return openMovie(inputPath,0,stat.size);
     if (stat.size > limit) fail('Choose a decoded resource no larger than 128 MiB.');
+    if (conversion && kind!=='convertYmap') return convertGta5(kind,inputPath);
     bytes=readFileSync(inputPath);
     label=basename(inputPath);
     systemSize=bytes.length;
+    if (kind==='convertYmap' && extname(inputPath).toLowerCase()==='.json') {
+      return convertGta5(kind,inputPath,JSON.parse(bytes.toString('utf8')));
+    }
   } else {
     const {state,info}=infoFor(archive);
     const row=rowFor(info,String(entry));
     if (row.pool || row.shader || row.bvh || row.kind==='archive') fail('Select a file entry or choose a decoded file.');
+    if (conversion && kind!=='convertYmap') fail('Open a decoded OBJ, DDS or archetype JSON file.');
     inputPath=info.archive.path;
     label=describeRow(row,state).name.split('/').at(-1);
     if (kind==='movie') {
@@ -512,11 +523,24 @@ async function runTool({ kind, archive, entry, path, index, roads }) {
     bytes=decodePayload(state.game,info.archive,row);
     systemSize=row.systemSize ?? bytes.length;
   }
+  if (kind==='toolGroom' && bytes.toString('ascii',0,8)==='OS6GRM01') {
+    if (bytes.length<16) fail('The groom bundle header is incomplete.');
+    systemSize=bytes.readUInt32LE(8);
+    const graphicsSize=bytes.readUInt32LE(12);
+    if (!systemSize || !graphicsSize || systemSize+graphicsSize!==bytes.length-16) fail('The groom bundle page lengths disagree.');
+    bytes=bytes.subarray(16);
+  }
   if (kind==='terrain') {
     const map=previewResource(bytes);
     if (map?.type!=='heightmap') fail('Choose an MHIU heightmap.');
     return {...map,title:label,bounds:Array.from({length:6},(_,i)=>bytes.readFloatLE(12+4*i)),
       sourceWidth:bytes.readUInt16LE(6),sourceHeight:bytes.readUInt16LE(8)};
+  }
+  if (kind==='convertYmap') {
+    const report=await buildAssetPreview({kind:'toolMap',archive:inputPath,name:label,system_size:systemSize},bytes);
+    const file=assetPreviewFile(report.id,'report.json');
+    if (!file) fail('No decoded map placement report.');
+    return convertGta5(kind,inputPath,JSON.parse(readFileSync(file.path,'utf8')));
   }
   return buildAssetPreview({kind,archive:inputPath,name:label,system_size:systemSize,index,detail:roads===true ? 1 : null},bytes);
 }
@@ -536,6 +560,14 @@ export function prepareArchiveReport(key, kind) {
   const data = Buffer.from(JSON.stringify({archive:archive.name,signature:archive.headerSignature??null,
     entries:rows.length,rows},null,2)+'\n');
   return {name:safeFilename(archive.name)+'.'+kind+'.json',sources:inputFiles(state),length:data.length,verify,read:()=>data};
+}
+
+export function prepareNewArchive(path) {
+  const state=requireWorkspace();
+  if (!state.game) fail('Open the matching Scarlett executable with an RPF9 first.');
+  const folder=getPath(path);
+  if (!statSync(folder).isDirectory()) fail('Choose a folder of source files.');
+  return {name:safeFilename(basename(folder))+'.rpf',...prepareUnsignedRpf9(state.game,folder,inputFiles(state))};
 }
 
 async function previewEntry(url) {

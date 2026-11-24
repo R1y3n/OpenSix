@@ -1,6 +1,8 @@
 # GTA VI tool audit
 
-This compares OpenSix 1.1.0 with the catalog at revision `035c311`. The catalog supplies the project scope and upstream claims. The OpenSix column records what the Windows build exposes and where the work stops. Upstream runtime claims were reviewed as documentation. [Catalog snapshot](https://github.com/Ahmet-Dedeler/awesome-gta6-reverse-engineering/blob/035c3111188e818fe0ee347500e55cfb5f5a4c65/README.md)
+This compares OpenSix 1.2.0 with the catalog at revision `035c311`. The catalog supplies the project scope and upstream claims. The OpenSix column records what the Windows build exposes and where the work stops. Upstream runtime claims were reviewed as documentation. [Catalog snapshot](https://github.com/Ahmet-Dedeler/awesome-gta6-reverse-engineering/blob/035c3111188e818fe0ee347500e55cfb5f5a4c65/README.md)
+
+The groom check recovered paired system and graphics blocks from `packs.rpf`, verified the original 16 MiB download piece, and exported 191 strands and 1,337 guide points. The script check opened a signed child archive in `script.rpf` and exported parseable XML with 17 elements. Unresolved XML tag names are retained as hashes.
 
 ## Archive and asset tools
 
@@ -11,7 +13,7 @@ This compares OpenSix 1.1.0 with the catalog at revision `035c311`. The catalog 
 | [SixNG](https://github.com/holdmysocks/SixNG) | OpenSix calls the existing pinned worker for models, textures, clips, collision and newer tools for localization, grooms, cloth, particles, placements and navigation. Complete interior assembly, attachment-aware character export and a streamed world remain open. |
 | [6stars](https://github.com/meetox80/6stars) | Terrain and timecycle data are readable. A world renderer with terrain LODs, interiors, vegetation and weather is a separate implementation. |
 | [rpf9-explorer](https://github.com/breadbbbb/rpf9-explorer) | Shared texture and wardrobe components, previews, assemblies and export. Replacement project authoring and some authored vehicle and wardrobe materials remain open. |
-| [6to5m](https://github.com/DesignWithTommy/6to5m) | Source-side models, texture exports, map placements and navigation meshes. Creating functional GTA V or FiveM resources, collision and MLO portals requires a target-format conversion pipeline. |
+| [6to5m](https://github.com/DesignWithTommy/6to5m) | Its pinned converter writes YMAP, YDR, YBN, YTD and YTYP from OpenSix. A full region export with assembled FiveM interiors, textures and gameplay validation remains open. |
 | [vice-lens](https://github.com/Librett0/vice-lens) | Model, texture, audio, localization and terrain workflows. MP4 export, assembled placement views and a separate recovery scanner remain open. |
 | [gta6-explorer](https://github.com/HolyRoses/gta6-explorer) | Structured RPF9 table, SGD5 members and effect links, type inspection and verified name lookup. Carving and inferred schema-name collections provide additional coverage. |
 | [OpenRPF9](https://github.com/shrewbrewsh/OpenRPF9) | Text, hex, standalone TTPF, DDS and PNG, and decoded ADAT Opus export. TOC-independent recovery is a remaining workflow. |
@@ -31,7 +33,7 @@ This compares OpenSix 1.1.0 with the catalog at revision `035c311`. The catalog 
 | [rpf9-audio](https://github.com/jaylikesbunda/rpf9-audio) | ADAT Opus remuxing, supported PCM and XMA2 export, stems and playback. Opus-to-WAV batch conversion remains open. |
 | [AWC_from_RPF9_Extractor](https://github.com/Albotterin/AWC_from_RPF9_Extractor) | Playback and saving supported audio streams. The station, song and artist catalog and a dedicated radio player remain open. |
 | [SixFM](https://github.com/jaylikesbunda/SixFM) | OpenSix can listen to and export supported streams. Station scheduling, premix creation, AWC writing and verified archive replacement remain open. |
-| [bink2-decoder](https://github.com/codingkoala/bink2-decoder) | OpenSix plays supported movies with a verified local helper. A bundled clean-room Bink decoder and direct track export are separate gaps. |
+| [bink2-decoder](https://github.com/codingkoala/bink2-decoder) | Integrated Bink 2 video and DCT WAV export, both checked against real movies. Synchronized playback uses the local helper. RDFT audio and MP4 conversion remain open. |
 | [gta6-video-reader](https://github.com/hoshino-114514/gta6-video-reader) | Playback overlap. MP4 and multitrack export would need independent testing across the decoder variants in the game. |
 | [BK2toMP4](https://github.com/FluffyCyanNova/BK2toMP4) | Raw movie extraction and native playback are available. A batch conversion workflow is open. |
 

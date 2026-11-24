@@ -1,6 +1,6 @@
 use anyhow::{bail, ensure, Context, Result};
 use serde_json::{json, Value};
-use sixng_core::{cloth, drawable, groom, meta7a, navmesh, pso, ptfx, resource::Resource, scriptdoc, text, timecycle};
+use sixng_core::{cloth, drawable, gltf, groom, meta7a, navmesh, pso, ptfx, resource::Resource, scriptdoc, text, timecycle};
 use std::{fmt::Write, fs, path::Path};
 
 fn report(out: &Path, title: &str, data: Value, extra: &[(&str, &str)]) -> Result<Value> {
@@ -93,6 +93,14 @@ pub fn resource(kind: &str, asset: &Resource, name: &str, roads: bool, out: &Pat
             let groom = groom::parse(asset)?;
             ensure!(groom.points_per_strand>1 && groom.points.len()==groom.strands*groom.points_per_strand,
                 "The groom has no complete guide strands");
+            ensure!(groom.points.iter().flatten().all(|value|value.is_finite()),"The groom has non-finite guide coordinates");
+            let mut bundle=Vec::with_capacity(16+asset.sys.len()+asset.gfx.len());
+            bundle.extend_from_slice(b"OS6GRM01");
+            bundle.extend_from_slice(&u32::try_from(asset.sys.len())?.to_le_bytes());
+            bundle.extend_from_slice(&u32::try_from(asset.gfx.len())?.to_le_bytes());
+            bundle.extend_from_slice(&asset.sys);
+            bundle.extend_from_slice(&asset.gfx);
+            fs::write(out.join("guides.osgroom"),bundle)?;
             let mut obj = String::from("# OpenSix groom guides. Source axes and units.\n");
             for [x,y,z] in &groom.points { writeln!(obj,"v {x} {y} {z}")?; }
             for start in (0..groom.points.len()).step_by(groom.points_per_strand) {
@@ -101,10 +109,23 @@ pub fn resource(kind: &str, asset: &Resource, name: &str, roads: bool, out: &Pat
                 obj.push('\n');
             }
             fs::write(out.join("guides.obj"),obj)?;
-            report(out,"Hair and fur guides",json!({"strands":groom.strands,"pointsPerStrand":groom.points_per_strand,
+            let mut result=report(out,"Hair and fur guides",json!({"strands":groom.strands,"pointsPerStrand":groom.points_per_strand,
                 "points":groom.points,"roots":groom.roots,"lengths":groom.lengths,"boneHashes":groom.bones,
                 "bounds":groom.root_box,"rootUv":groom.root_uv,"strandsPerTriangle":groom.tri_counts,
-                "width":groom.width,"taper":groom.taper}),&[("Save guide OBJ","guides.obj")])
+                "width":groom.width,"taper":groom.taper}),&[("Save guide OBJ","guides.obj"),("Save groom bundle","guides.osgroom")])?;
+            if groom.points.len()<=250_000 {
+                let (positions,normals,uvs,indices)=groom.ribbons((groom.width*0.5).max(0.0004));
+                let triangles=indices.len()/3;
+                let prim=gltf::TriPrim{name:"Guide ribbons".into(),positions,normals:Some(normals),tangents:None,uvs:vec![uvs],
+                    colors:None,tint:None,indices,material:Some(0),joints:None,weights:None,joints1:None,weights1:None};
+                let group=gltf::NodeGroup{name:"Strand guides".into(),prims:vec![prim]};
+                let material=gltf::Material{name:"Guide display".into(),base_color_uri:None,normal_uri:None,
+                    gltf:json!({"doubleSided":true,"emissiveFactor":[0.12,0.55,0.42],"pbrMetallicRoughness":{
+                        "baseColorFactor":[0.25,0.75,0.62,1.0],"metallicFactor":0.0,"roughnessFactor":1.0}}),extras:Value::Null};
+                fs::write(out.join("model.glb"),gltf::mesh_glb(name,&[group],&[material],&[],json!({"guideCount":groom.strands})))?;
+                result["mesh"]=json!({"type":"model","items":[],"lods":[],"triangles":triangles,"file":"model.glb"});
+            }
+            Ok(result)
         }
         "toolCloth" => {
             let cloth = cloth::parse(asset,&Default::default())?;

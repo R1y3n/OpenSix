@@ -7,10 +7,10 @@ import { Readable } from 'node:stream';
 import { hasByteRange } from './available-ranges.mjs';
 
 const EXECUTABLE_HASH = 'e95020b2fa4a721db3df59fdecf75621730ac559d8835252f6c3b658d5a08993';
-const FILE_TABLE = 0x33f70dfaf2c50989n;
+export const FILE_TABLE = 0x33f70dfaf2c50989n;
 const RESOURCE_TABLE = 0xba180afb232d1b4bn;
-const HASH64_TABLE = 0x73bcb72dce74f11fn;
-const HASH32_TABLE = 0xb7076b6245d35fb5n;
+export const HASH64_TABLE = 0x73bcb72dce74f11fn;
+export const HASH32_TABLE = 0xb7076b6245d35fb5n;
 const LOOKUP_TABLE = 0xb6f5bdb2c66da2e9n;
 const CRYPTO_TABLE = 0x286030a358a789fbn;
 const CHUNK_TABLE = 0xe0c12d7a5d4884c5n;
