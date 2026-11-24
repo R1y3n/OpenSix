@@ -108,6 +108,7 @@ export function setupTools({ current, openPool, openFound, notify }) {
     el('tool-search-form').reset();
     el('tool-roads').checked=false;
     el('tool-road-filter').hidden=kind!=='toolNavmesh';
+    browse.disabled=false;
     source=current();
     selected.disabled=!source.entry || ['archive','poolTexture','shaderRecord','gpuBvh'].includes(source.entry.kind);
     el('tool-selection').textContent=selected.disabled ? 'Select an archive entry or open a decoded file.' : source.entry.name;
@@ -176,7 +177,11 @@ export function setupTools({ current, openPool, openFound, notify }) {
       }
       const files=node('div');
       files.className='tool-actions';
-      for (const file of result.files) files.append(action(file.name,()=>save(result.id,file.file)));
+      for (const file of result.files) {
+        if (!result.mesh || !['model.glb','model.fbx'].includes(file.file)) {
+          files.append(action(file.name,()=>save(result.id,file.file)));
+        }
+      }
       if (result.mesh) {
         // The modal uses the established 3D renderer. Its archive counterpart stays mounted.
         dispose=renderAsset(output,{...result.mesh,id:result.id},()=>{},file=>save(result.id,file),onError);
@@ -257,5 +262,10 @@ export function setupTools({ current, openPool, openFound, notify }) {
     } catch(error) { if (ticket===revision) showStatus(error.message,true); }
   });
   el('close-tool').addEventListener('click',()=>dialog.close());
-  dialog.addEventListener('close',()=>{ revision++; browse.disabled=false; clearOutput(); });
+  dialog.addEventListener('close',()=>{
+    if (dialog.open) return;
+    revision++;
+    browse.disabled=false;
+    clearOutput();
+  });
 }
