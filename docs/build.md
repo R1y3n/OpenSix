@@ -25,14 +25,18 @@ The build checks out the pinned SixNG revision under `.deps/sixng`, applies the 
 
 The texture-pool worker uses the pinned rpf9-explorer checkout under `.deps/rpf9-explorer`. The build publishes it as a self-contained Windows executable.
 
-The BCPack fallback builds the GPLv3 decoder from the pinned VIctory checkout at `d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989`. OpenSix checks the revision's BCPack table file before using it. Source runs read the file from the checkout. Portable runs can read it alongside `OpenSix.exe` or from the absolute path in `OPENSIX_BCPACK_TABLES`. The upstream project's asset policy identifies the table file as outside its code license, so the build includes the decoder and its license and loads the table separately.
+The texture-pool worker loads a BCPack library built from VIctory revision `d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989`. The portable EXE includes this library and opens it automatically. A source checkout can supply the verified BCPack table file. A portable build reads the table file from beside `OpenSix.exe` or from the absolute path in `OPENSIX_BCPACK_TABLES`. The table file has its own terms. See [VIctory's asset policy](https://github.com/Marvisak/VIctory/blob/d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989/docs/asset-policy.md).
 
 Use `node app/cli.mjs --help` for JSON Lines archive search and batch extraction from a source checkout.
 Use `OpenSix.exe --cli search` with `--report` and an absolute path to a new output file when running from the portable launcher.
 
 To play XMA2 streams, make FFmpeg available on `PATH` or set `OPENSIX_FFMPEG` to its absolute path. To preview Bink movies, place `Tools/bink-player.exe` from rpf9-explorer v1.3 next to the portable OpenSix executable or set `OPENSIX_BINK_PLAYER` to its absolute path. OpenSix verifies the helper's SHA-256. Bink preview frames are streamed through memory.
 
-To build a portable Windows executable locally, run the script with `-Portable`. The result is `app/release/OpenSix.exe`. Local builds are unsigned by default and are separate from the project's release artifacts.
+To build a portable Windows executable locally, run the script with `-Portable`. The result is `app/release/OpenSix.exe`. The build is unsigned unless a signing configuration is supplied.
+
+## Component licenses
+
+The [OpenSix license](../LICENSE) covers the original desktop app under its noncommercial terms. The bundled SixNG preview worker and texture-pool worker with the VIctory BCPack library are GPL-3.0-only. Their corresponding source is available alongside the executable on the release page. See the [SixNG source notes](../third_party/sixng/README.md) and [rpf9-explorer notices](../third_party/rpf9-explorer/NOTICE.md).
 
 ## Project layout
 
@@ -40,6 +44,7 @@ To build a portable Windows executable locally, run the script with `-Portable`.
 | --- | --- |
 | `app/` | Desktop window, archive reader, path index, and viewers |
 | `native/preview/` | Rust worker for model, texture, and audio previews |
+| `native/bcpack/` | VIctory BCPack library loaded by the texture-pool worker |
 | `native/fbx/` | Windows GLB-to-FBX converter with embedded textures |
 | `native/texture-pools/` | Self-contained TTPF and wardrobe catalog reader |
 | `third_party/sixng/` | Local SixNG changes and upstream license |

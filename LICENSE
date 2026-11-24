@@ -11,11 +11,14 @@ redistribution also requires permission unless authorized by applicable law
 or by the terms of the service hosting the source. All rights beyond the
 permissions granted in this license are reserved.
 
-This license applies only to original OpenSix material offered under these
-terms. Third-party components retain their own licenses. SixNG, changes to
-SixNG, and any other work covered by GPL-3.0-only remain governed by that
-license. The applicable third-party license governs the distribution of its
-covered components in source or binary form.
+These terms apply to the original OpenSix desktop app. The OpenSix copyright
+holders license their code in native/preview, native/texture-pools, and
+native/bcpack under GNU General Public License version 3 only (GPL-3.0-only).
+The linked preview and texture-pool components are distributed under GPL-3.0-only.
+The noncommercial terms above do not apply to those components.
+
+Third-party material retains its applicable terms. See third_party/ and the
+license and source notices supplied with the release.
 
 Nothing in this license restricts rights granted by a third-party license or
 rights that cannot be waived under applicable law.
