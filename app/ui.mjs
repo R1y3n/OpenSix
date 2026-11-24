@@ -341,7 +341,15 @@ async function loadPreview(archive, entry, current, index=null, detail=null, sli
         selectedClip=clip ? {archive,entry:entry.id,index} : null;
         if (clip) message('Selected '+clip.name+'. Open a skinned model to play it.');
         else loadPreview(archive,entry,++model.previewRevision);
-      },(_action,kit)=>showAssembly('/api/wardrobe-assembly',{id:kit.id}));
+      },async (action,value)=>{
+        if (action==='wardrobe') return showAssembly('/api/wardrobe-assembly',{id:value.id});
+        if (action==='saveMip') {
+          try {
+            const saved=await window.opensix.save(archive,entry.id,false,value);
+            if (saved) message('Saved '+saved+'.');
+          } catch(error) { message(error.message,true); }
+        }
+      });
       if (isModel && result.type==='model') assemblyControls(display,result,archive,entry);
       return;
     }

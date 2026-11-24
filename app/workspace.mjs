@@ -463,18 +463,21 @@ export function preparePreviewExport(id, name) {
     read:() => createReadStream(file.path) };
 }
 
-export function prepareExport(archive, entry, stored) {
+export function prepareExport(archive, entry, stored, mip) {
   const { state, info } = infoFor(archive);
   const row = rowFor(info, String(entry));
   if (info.archive.pool) {
     verifyPool(info.archive);
     if (stored) fail('Texture pools export the selected image as DDS.');
-    return buildAssetPreview({kind:'poolDds',archive:info.archive.path,index:row.id}).then(result=>{
+    if (mip!==undefined && (!Number.isInteger(mip) || mip<0 || mip>31)) fail('Choose a valid source mip.');
+    return buildAssetPreview({kind:'poolDds',archive:info.archive.path,index:row.id,detail:mip}).then(result=>{
       verifyPool(info.archive);
       const file=preparePreviewExport(result.id,result.file);
-      return {...file,name:safeFilename(row.name.replace(/\.dds$/i,''))+'.dds'};
+      const suffix=mip===undefined ? '' : '_mip'+mip;
+      return {...file,name:safeFilename(row.name.replace(/\.dds$/i,''))+suffix+'.dds'};
     });
   }
+  if (mip!==undefined) fail('Mip selection is available for texture pools.');
   const raw = stored === true;
   const entryInfo = describeRow(row, state);
   const name = safeFilename(entryInfo.name) + (raw ? ".stored" : "");

@@ -67,7 +67,8 @@ function embedModelImages(folder) {
 }
 
 export async function buildAssetPreview(request, bytes, clip, parts=[]) {
-  const name = request.kind.startsWith('pool') || request.kind==='wardrobe' ? 'opensix-pool.exe' : 'opensix-preview.exe';
+  const isPool=request.kind.startsWith('pool');
+  const name = isPool || request.kind==='wardrobe' ? 'opensix-pool.exe' : 'opensix-preview.exe';
   const worker = process.resourcesPath && existsSync(join(process.resourcesPath,name))
     ? join(process.resourcesPath,name)
     : join(root,'worker',name);
@@ -78,7 +79,8 @@ export async function buildAssetPreview(request, bytes, clip, parts=[]) {
     for (const [index,part] of parts.entries()) writeFileSync(join(folder,'part-'+index+'.bin'),part);
     writeFileSync(join(folder,'request.json'),JSON.stringify(request));
     const maxBuffer = request.kind==='poolIndex' ? 64*1024*1024 : 4*1024*1024;
-    const {stdout} = await execute(worker,[folder],{windowsHide:true,timeout:120_000,maxBuffer});
+    const {stdout} = await execute(worker,[folder],{windowsHide:true,timeout:120_000,maxBuffer,
+      env:isPool ? poolEnvironment() : process.env});
     const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
     if (result.type==='poolIndex' || result.type==='unrecognized') {
       rmSync(folder,{recursive:true,force:true});
@@ -96,6 +98,15 @@ export async function buildAssetPreview(request, bytes, clip, parts=[]) {
     rmSync(folder,{recursive:true,force:true});
     throw new Error(error.stderr?.toString().trim() || error.message);
   }
+}
+
+function poolEnvironment() {
+  if (process.env.OPENSIX_BCPACK_TABLES) return process.env;
+  const portable=process.env.PORTABLE_EXECUTABLE_DIR;
+  const path=[portable && isAbsolute(portable) && join(portable,'bcpack-tables.bin'),
+    join(root,'..','.deps','victory','crates','victory-formats','src','bcpack-tables.bin')]
+    .find(candidate=>candidate && existsSync(candidate));
+  return path ? {...process.env,OPENSIX_BCPACK_TABLES:path} : process.env;
 }
 
 async function addXmaPlayback(folder, result) {

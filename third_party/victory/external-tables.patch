@@ -1,0 +1,8 @@
+diff --git a/crates/victory-formats/src/bcpack.rs b/crates/victory-formats/src/bcpack.rs
+index cb4ea53..cb6b147 100644
+--- a/crates/victory-formats/src/bcpack.rs
++++ b/crates/victory-formats/src/bcpack.rs
+@@ -117,2 +117,3 @@ impl Tables {
+     /// The tables VIctory ships with.
++    #[cfg(test)]
+     pub fn builtin() -> Result<Tables, Error> {

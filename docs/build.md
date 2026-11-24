@@ -25,6 +25,8 @@ The build checks out the pinned SixNG revision under `.deps/sixng`, applies the 
 
 The texture-pool worker uses the pinned rpf9-explorer checkout under `.deps/rpf9-explorer`. The build publishes it as a self-contained Windows executable.
 
+The BCPack fallback builds the GPLv3 decoder from the pinned VIctory checkout at `d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989`. OpenSix checks the revision's BCPack table file before using it. Source runs read the file from the checkout. Portable runs can read it alongside `OpenSix.exe` or from the absolute path in `OPENSIX_BCPACK_TABLES`. The upstream project's asset policy identifies the table file as outside its code license, so the build includes the decoder and its license and loads the table separately.
+
 Use `node app/cli.mjs --help` for JSON Lines archive search and batch extraction from a source checkout.
 Use `OpenSix.exe --cli search` with `--report` and an absolute path to a new output file when running from the portable launcher.
 

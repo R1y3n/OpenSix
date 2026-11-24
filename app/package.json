@@ -56,6 +56,8 @@
       { "from": "worker/opensix-preview.exe", "to": "opensix-preview.exe" },
       { "from": "worker/opensix-fbx.exe", "to": "opensix-fbx.exe" },
       { "from": "worker/opensix-pool.exe", "to": "opensix-pool.exe" },
+      { "from": "worker/opensix_bcpack.dll", "to": "opensix_bcpack.dll" },
+      { "from": "worker/VIctory.LICENSE.txt", "to": "licenses/VIctory.txt" },
       { "from": "worker/DotNet.LICENSE.txt", "to": "licenses/DotNet.LICENSE.txt" },
       { "from": "worker/DotNet.NOTICES.txt", "to": "licenses/DotNet.NOTICES.txt" },
       { "from": "../third_party/rpf9-explorer/NOTICE.md", "to": "licenses/Rpf9Explorer.md" },

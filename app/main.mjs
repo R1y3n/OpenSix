@@ -80,8 +80,9 @@ function matchesSource(path, source) {
     (dest.ino !== 0 && dest.ino === original.ino && dest.dev === original.dev);
 }
 
-async function save(archive, entry, stored) {
-  return saveFile(await prepareExport(archive,entry,stored),stored ? 'Save stored bytes' : 'Extract file');
+async function save(archive, entry, stored, mip) {
+  const file=await prepareExport(archive,entry,stored,mip);
+  return saveFile(file,mip!==undefined ? 'Save DDS mip chain' : stored ? 'Save stored bytes' : 'Extract file');
 }
 
 async function savePreview(id, name) {

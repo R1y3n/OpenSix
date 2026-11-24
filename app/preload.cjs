@@ -9,7 +9,7 @@ function unwrap(reply) {
 
 contextBridge.exposeInMainWorld('opensix', {
   request: (path, payload) => ipcRenderer.invoke('opensix:request', path, payload).then(unwrap),
-  save: (archive, entry, stored) => ipcRenderer.invoke('opensix:save', archive, entry, stored).then(unwrap),
+  save: (archive, entry, stored, mip) => ipcRenderer.invoke('opensix:save', archive, entry, stored, mip).then(unwrap),
   choose: kind => ipcRenderer.invoke('opensix:choose',kind).then(unwrap),
   savePreview: (id,name) => ipcRenderer.invoke('opensix:save-preview',id,name).then(unwrap),
 });

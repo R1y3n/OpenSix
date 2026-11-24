@@ -7,6 +7,7 @@ try
     string folder = args[0];
     var request = JsonSerializer.Deserialize<PoolRequest>(File.ReadAllText(Path.Combine(folder, "request.json")),
         new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? throw new InvalidDataException("Missing pool request.");
+    if (request.Kind.StartsWith("pool", StringComparison.Ordinal)) VictoryBcpack.Configure();
     object response = request.Kind switch
     {
         "poolIndex" => Index(request.Archive),
@@ -40,20 +41,36 @@ static object Preview(PoolRequest request, string folder)
 {
     var texture = Texture(request);
     int mip = request.Detail ?? texture.PreviewMipLevel;
+    int requestedMip = mip;
     int slice = request.Slice ?? 0;
-    int slices = texture.Dimension == 3 ? Math.Max(1, texture.Depth >> mip) : texture.Depth;
+    if (request.Detail.HasValue && (mip < texture.BaseMipLevel || mip >= texture.BaseMipLevel + texture.Mips))
+        throw new ArgumentOutOfRangeException(nameof(request.Detail));
     string? file = null;
     string? note = texture.Limitation;
+    string? blockedMip = null;
     if (texture.CanExtract)
     {
-        try
+        int endMip = (request.Detail.HasValue || request.Slice.HasValue) ? mip + 1 : texture.BaseMipLevel + texture.Mips;
+        for (; mip < endMip; mip++)
         {
-            var bitmap = TtpfReader.DecodeTexturePixelsAtMip(request.Archive, texture.Index, mip, slice);
-            file = "texture.png";
-            File.WriteAllBytes(Path.Combine(folder, file), PngWriter.Encode(bitmap));
+            try
+            {
+                var bitmap = TtpfReader.DecodeTexturePixelsAtMip(request.Archive, texture.Index, mip, slice);
+                file = "texture.png";
+                File.WriteAllBytes(Path.Combine(folder, file), PngWriter.Encode(bitmap));
+                if (mip != requestedMip) note = $"Showing verified mip {mip}. Mip {requestedMip} is unavailable. {blockedMip}";
+                break;
+            }
+            catch (BcpackProvisionalException error)
+            {
+                blockedMip ??= error.Message;
+                note = blockedMip;
+            }
+            catch (NotSupportedException error) { note = error.Message; break; }
         }
-        catch (NotSupportedException error) { note = error.Message; }
     }
+    if (file is null) mip = requestedMip;
+    int slices = texture.Dimension == 3 ? Math.Max(1, texture.Depth >> mip) : texture.Depth;
     return new
     {
         type = "poolTexture", file, note, index = texture.Index,
@@ -66,7 +83,11 @@ static object Preview(PoolRequest request, string folder)
 static object Export(PoolRequest request, string folder)
 {
     const string file = "texture.dds";
-    File.WriteAllBytes(Path.Combine(folder, file), TtpfReader.CreateDds(request.Archive, request.Index ?? -1));
+    int index = request.Index ?? -1;
+    var data = request.Detail is int mip
+        ? TtpfReader.CreateDdsFromMip(request.Archive,index,mip)
+        : TtpfReader.CreateDds(request.Archive,index);
+    File.WriteAllBytes(Path.Combine(folder, file), data);
     return new {type = "file", file};
 }
 

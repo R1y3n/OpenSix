@@ -7,6 +7,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $decoder = Join-Path $root '.deps/sixng'
 $assimp = Join-Path $root '.deps/assimp'
 $explorer = Join-Path $root '.deps/rpf9-explorer'
+$victory = Join-Path $root '.deps/victory'
 $poolBuild = Join-Path $root '.deps/pool-build'
 $fbxBuild = Join-Path $root '.deps/fbx-build'
 $app = Join-Path $root 'app'
@@ -28,6 +29,7 @@ function Initialize-Dependency($Path, $Repository, $Revision) {
 Initialize-Dependency $decoder 'https://github.com/holdmysocks/SixNG.git' '08f1c2ed211aa80cfc7b0edfc472b89a723a3567'
 Initialize-Dependency $assimp 'https://github.com/assimp/assimp.git' 'a79ff6bbce54d3e01186a918dc6374ed55317426'
 Initialize-Dependency $explorer 'https://github.com/breadbbbb/rpf9-explorer.git' 'af549336624fdabf7d1bb6f00b8783e7e1ef692e'
+Initialize-Dependency $victory 'https://github.com/Marvisak/VIctory.git' 'd2a4bae1f49533ef5cb512fd1b1ba1513f2e1989'
 
 function Apply-DependencyPatch($Path, $Patch) {
     $PSNativeCommandUseErrorActionPreference = $false
@@ -42,11 +44,13 @@ function Apply-DependencyPatch($Path, $Patch) {
 Apply-DependencyPatch $decoder (Join-Path $root 'third_party/sixng/preview-api.patch')
 Apply-DependencyPatch $assimp (Join-Path $root 'third_party/assimp/fbx-uv-layers.patch')
 Apply-DependencyPatch $explorer (Join-Path $root 'third_party/rpf9-explorer/ttpf-preview.patch')
+Apply-DependencyPatch $victory (Join-Path $root 'third_party/victory/external-tables.patch')
 
 $previousRustFlags = $env:RUSTFLAGS
 try {
     $env:RUSTFLAGS = ('{0} -C target-feature=+crt-static' -f $previousRustFlags).Trim()
     cargo build --locked --release --target $target --manifest-path (Join-Path $root 'native/preview/Cargo.toml')
+    cargo build --locked --release --target $target --manifest-path (Join-Path $root 'native/bcpack/Cargo.toml')
 } finally {
     $env:RUSTFLAGS = $previousRustFlags
 }
@@ -54,6 +58,9 @@ $worker = Join-Path $app 'worker'
 $targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $root 'native/preview/target' }
 New-Item -ItemType Directory -Force -Path $worker | Out-Null
 Copy-Item -LiteralPath (Join-Path $targetDir "$target/release/opensix-preview.exe") -Destination $worker -Force
+$bcpackTargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $root 'native/bcpack/target' }
+Copy-Item -LiteralPath (Join-Path $bcpackTargetDir "$target/release/opensix_bcpack.dll") -Destination $worker -Force
+Copy-Item -LiteralPath (Join-Path $victory 'LICENSE') -Destination (Join-Path $worker 'VIctory.LICENSE.txt') -Force
 dotnet publish (Join-Path $root 'native/texture-pools/OpenSix.Pools.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -o $poolBuild --nologo
 Copy-Item -LiteralPath (Join-Path $poolBuild 'opensix-pool.exe') -Destination $worker -Force
 $poolAssets = Get-Content -LiteralPath (Join-Path $root 'native/texture-pools/obj/project.assets.json') -Raw | ConvertFrom-Json -AsHashtable

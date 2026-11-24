@@ -214,6 +214,9 @@ export function renderAsset(parent,result,select,save,onError,configureClip,arra
       preview.src=urlFor(result.id,result.file);
       parent.append(preview);
       exportButton(parent,'Save PNG',result.file,save);
+      if (result.mip>result.baseMip) {
+        exportButton(parent,'Save DDS from mip '+result.mip,result.mip,mip=>arrange('saveMip',mip));
+      }
     }
     return null;
   }
