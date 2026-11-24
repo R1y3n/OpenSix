@@ -40,8 +40,25 @@ function freshState(archive) {
   model.page = 0;
   el('search').value = '';
   el('filter').value = 'all';
+  el('index-model-labels').hidden=Boolean(model.archives.find(item=>item.id===archive)?.pool);
   clearSelection();
 }
+
+el('index-model-labels').addEventListener('click',async event=>{
+  const archive=model.active;
+  const button=event.currentTarget;
+  button.disabled=true;
+  message('Reading embedded model labels…');
+  try {
+    const result=await api('/api/index-model-labels',{archive});
+    if (model.active===archive) {
+      message(result.indexed.toLocaleString()+' entries with model labels'+
+        (result.unavailable ? ' · '+result.unavailable.toLocaleString()+' unreadable' : '')+'.');
+      await loadList();
+    }
+  } catch(error) { message(error.message,true); }
+  finally { button.disabled=false; }
+});
 
 function renderArchives() {
   const nav = el('archives');
@@ -69,7 +86,7 @@ function renderArchives() {
     item.append(name, count);
     nav.append(item);
   }
-  el('import-names').disabled = !model.archives.length;
+  el('import-names').disabled = !model.archives.some(archive=>!archive.pool);
 }
 
 function renderFolders(folders) {
@@ -158,8 +175,11 @@ async function loadList() {
     el('breadcrumb').textContent = model.scope
       ? 'Archives / ' + archive.name + ' / ' + model.scope : 'Archives';
     el('archive-name').textContent = archive.name;
-    el('archive-meta').textContent = archive.entries.toLocaleString() + ' entries · ' +
-      archive.resolved.toLocaleString() + ' names resolved · ' + size(archive.size);
+    el('archive-meta').textContent = archive.pool
+      ? archive.entries.toLocaleString() + ' textures · ' + size(archive.size)
+      : archive.entries.toLocaleString() + ' entries · ' + archive.resolved.toLocaleString() + ' names resolved · ' +
+        size(archive.size) + (archive.headerSignature==='verified' ? ' · Header signature verified' : ' · Unsigned header');
+    el('filter').disabled = archive.pool;
     if (model.selection && !data.rows.some(entry => entry.id === model.selection.id)) clearSelection();
     renderFolders(data.folders);
     renderRows(data.rows);
@@ -179,6 +199,77 @@ async function loadList() {
 }
 
 let disposePreview = null;
+let selectedClip = null;
+const assemblyParts = [];
+
+function saveDecoded(result, filename) {
+  return window.opensix.savePreview(result.id,filename).then(saved=>{
+    if (saved) message('Saved '+saved+'.');
+  }).catch(error=>message(error.message,true));
+}
+
+async function showAssembly(endpoint, input) {
+  const current=++model.previewRevision;
+  const display=el('resource-preview');
+  const onError=error=>{ if (current===model.previewRevision) el('preview-note').textContent=error.message; };
+  el('preview-note').textContent='Assembling selected parts…';
+  try {
+    const result=await api(endpoint,{...input,clip:selectedClip});
+    if (current!==model.previewRevision) return;
+    disposePreview?.();
+    display.replaceChildren();
+    el('preview-note').textContent=result.note ?? '';
+    const modelResult={...result,items:[],lods:[],animation:result.animation};
+    disposePreview=renderAsset(display,modelResult,()=>{},filename=>saveDecoded(result,filename),onError,()=>{
+      selectedClip=null;
+      showAssembly(endpoint,input);
+    });
+  } catch(error) { onError(error); }
+}
+
+function assemblyControls(parent, result, archive, entry) {
+  const section=document.createElement('details');
+  const summary=document.createElement('summary');
+  const title=()=>{summary.textContent='Model assembly · '+assemblyParts.length+' selected';};
+  title();
+  section.append(summary);
+  const component={archive,entry:entry.id,index:result.index,detail:result.detail};
+  const add=part=>{
+    if (assemblyParts.length>=32) return message('An assembly can contain up to 32 parts.',true);
+    if (assemblyParts.some(other=>JSON.stringify(other)===JSON.stringify(part))) return message('That drawable is already in the assembly.');
+    assemblyParts.push(part);
+    title();
+    message('Added '+(result.name ?? entry.name)+'.');
+  };
+  section.append(button('Add drawable',()=>add(component)));
+  const wheelInputs=[];
+  for (const side of ['Front','Rear']) {
+    const field=document.createElement('input');
+    field.type='number';
+    field.min='0.01';
+    field.max='10';
+    field.step='0.01';
+    field.placeholder=side+' scale';
+    field.setAttribute('aria-label',side+' wheel scale');
+    wheelInputs.push(field);
+    section.append(field);
+  }
+  section.append(button('Add wheel component',()=>{
+    if (!assemblyParts.length) return message('Add the vehicle body first.',true);
+    const wheelScale=wheelInputs.map(field=>Number(field.value));
+    if (wheelScale.some(scale=>!Number.isFinite(scale) || scale<0.01 || scale>10)) {
+      return message('Enter front and rear wheel scales between 0.01 and 10.',true);
+    }
+    add({...component,wheelScale});
+  }),button('Preview assembly',()=>{
+    if (assemblyParts.length<2) return message('Add at least two drawables.',true);
+    showAssembly('/api/assembly',{parts:[...assemblyParts]});
+  }),button('Clear parts',()=>{
+    assemblyParts.length=0;
+    title();
+  }));
+  parent.append(section);
+}
 
 function showResource(result) {
   const preview = el('resource-preview');
@@ -214,7 +305,7 @@ function showResource(result) {
   el('preview').hidden = true;
 }
 
-async function loadPreview(archive, entry, current, index=null, detail=null) {
+async function loadPreview(archive, entry, current, index=null, detail=null, slice=null) {
   disposePreview?.();
   disposePreview=null;
   const display=el('resource-preview');
@@ -223,24 +314,35 @@ async function loadPreview(archive, entry, current, index=null, detail=null) {
   el('preview').hidden=false;
   el('preview').textContent='';
   el('preview-note').textContent='Reading preview…';
+  const clip=selectedClip;
+  const isModel=['zdr','zdd','zft'].includes(entry.type.toLowerCase());
   try {
     const query = new URLSearchParams({archive,entry:entry.id});
     if (index!==null) query.set('index',index);
     if (detail!==null) query.set('detail',detail);
+    if (slice!==null) query.set('slice',slice);
+    if (clip && isModel) {
+      query.set('clipArchive',clip.archive);
+      query.set('clipEntry',clip.entry);
+      query.set('clipIndex',clip.index);
+    }
     const result=await api('/api/preview?'+query);
-    if (current!==model.previewRevision) return;
-    if (['model','textures','bank'].includes(result.type)) {
+    if (current!==model.previewRevision) {
+      if (result.type==='movie') await api('/api/movie-command',{id:result.id,action:'close'});
+      return;
+    }
+    if (['model','textures','bank','inspection','poolTexture','movie','wardrobe'].includes(result.type)) {
       el('preview-note').textContent=result.note??'';
       display.hidden=false;
       el('preview').hidden=true;
-      disposePreview=renderAsset(display,result,(choice,mip)=>{
-        loadPreview(archive,entry,++model.previewRevision,choice,mip);
-      },async filename=>{
-        try {
-          const saved=await window.opensix.savePreview(result.id,filename);
-          if (saved) message('Saved '+saved+'.');
-        } catch (error) { message(error.message,true); }
-      },error=>{el('preview-note').textContent=error.message;});
+      disposePreview=renderAsset(display,result,(choice,mip,face=null)=>{
+        loadPreview(archive,entry,++model.previewRevision,choice,mip,face);
+      },filename=>saveDecoded(result,filename),error=>{el('preview-note').textContent=error.message;},(clip,index)=>{
+        selectedClip=clip ? {archive,entry:entry.id,index} : null;
+        if (clip) message('Selected '+clip.name+'. Open a skinned model to play it.');
+        else loadPreview(archive,entry,++model.previewRevision);
+      },(_action,kit)=>showAssembly('/api/wardrobe-assembly',{id:kit.id}));
+      if (isModel && result.type==='model') assemblyControls(display,result,archive,entry);
       return;
     }
     const media=['heightmap','image','audio'].includes(result.type);
@@ -252,7 +354,20 @@ async function loadPreview(archive, entry, current, index=null, detail=null) {
     if (media) showResource(result);
     else el('preview').textContent=result.value;
   } catch (error) {
-    if (current===model.previewRevision) el('preview-note').textContent=error.message;
+    if (current===model.previewRevision) {
+      el('preview-note').textContent=error.message;
+      if (clip && isModel) {
+        const clear=document.createElement('button');
+        clear.type='button';
+        clear.textContent='Clear selected clip';
+        clear.addEventListener('click',()=>{
+          selectedClip=null;
+          loadPreview(archive,entry,++model.previewRevision,index,detail,slice);
+        });
+        display.hidden=false;
+        display.append(clear);
+      }
+    }
   }
 }
 
@@ -263,13 +378,15 @@ async function selectEntry(entry) {
   for (const row of el('rows').rows) row.setAttribute('aria-selected', String(Number(row.dataset.entry) === entry.id));
   el('selection-empty').hidden = true;
   el('selection').hidden = false;
-  el('entry-kind').textContent = entry.resolved ? 'Verified path' : 'Unresolved filename';
+  const pool=entry.kind==='poolTexture';
+  el('entry-kind').textContent = pool ? entry.shape : entry.resolved ? 'Verified path' : 'Unresolved filename';
   el('entry-name').textContent = label(entry.name);
   el('entry-path').textContent = entry.resolved ? entry.name : '';
   const props = el('properties');
   props.replaceChildren();
   const data = [
-    ['Name source', entry.nameSource ?? 'Archive hash'],
+    ['Name source', pool ? 'Texture key' : entry.nameSource ?? 'Archive hash'],
+    ['Embedded model labels', entry.modelLabels?.join(', ') || null],
     ['64-bit hash', entry.hash64 ? '0x' + entry.hash64 : null, true],
     ['32-bit hash', entry.hash32 ? '0x' + entry.hash32 : null, true],
     ['Offset', hex(entry.offset), true],
@@ -289,7 +406,9 @@ async function selectEntry(entry) {
   }
   el('nested').hidden = entry.kind !== 'archive';
   el('nested').disabled = !entry.nestedAvailable;
-  el('extract').disabled = false;
+  el('extract').textContent = pool ? 'Save DDS' : 'Extract file';
+  el('extract').disabled = pool && !entry.exportable;
+  el('stored').hidden = pool;
   el('stored').disabled = false;
   await loadPreview(archive,entry,current);
 }
@@ -333,6 +452,22 @@ function requery() {
 }
 
 el('open').addEventListener('click', () => el('open-dialog').showModal());
+el('choose-pool').addEventListener('click', async () => {
+  const trigger=el('choose-pool');
+  trigger.disabled=true;
+  try {
+    const path=await window.opensix.choose('pool');
+    if (!path) return;
+    const data=await api('/api/open-pool',{path});
+    model.archives=data.archives;
+    freshState(data.selected);
+    el('open-dialog').close();
+    message();
+    renderArchives();
+    await loadList();
+  } catch(error) { message(error.message,true,el('open-error')); }
+  finally { trigger.disabled=false; }
+});
 for (const id of ['cancel', 'close-dialog']) el(id).addEventListener('click', () => el('open-dialog').close());
 for (const [buttonId,kind,inputId] of [
   ['choose-exe','executable','exe-path'],

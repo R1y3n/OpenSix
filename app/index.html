@@ -36,9 +36,10 @@
         </div>
       </div>
       <div id="entry-tools" class="entry-tools" hidden>
-        <label class="search"><span class="sr-only">Search by path or hash</span>
-          <input type="search" id="search" placeholder="Search by path or hash">
+        <label class="search"><span class="sr-only">Search entries</span>
+          <input type="search" id="search" placeholder="Search entries">
         </label>
+        <button id="index-model-labels" type="button">Index model labels</button>
         <label><span class="sr-only">Filter entries</span>
           <select id="filter">
             <option value="all">All entries</option>
@@ -93,6 +94,7 @@
         <input id="archive-path" type="text" required spellcheck="false">
         <button id="choose-archive" type="button">File</button>
         <button id="choose-folder" type="button">Folder</button>
+        <button id="choose-pool" type="button">Texture pool</button>
       </div>
       <p id="open-error" class="notice" role="alert" hidden></p>
       <div class="dialog-actions"><button id="cancel" type="button">Cancel</button><button class="primary" id="submit" type="submit">Open</button></div>

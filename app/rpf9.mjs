@@ -1,5 +1,5 @@
 
-import { createHash } from 'node:crypto';
+import { constants, createHash, createPublicKey, verify } from 'node:crypto';
 import { openSync, closeSync, fstatSync, readSync } from 'node:fs';
 import { basename } from 'node:path';
 import { createInflateRaw, inflateSync, inflateRawSync } from 'node:zlib';
@@ -38,6 +38,7 @@ export class GameExecutable {
   #base;
   #sections;
   #keys;
+  #headerKey;
   #decoders = new Map();
 
   constructor(path) {
@@ -112,6 +113,18 @@ export class GameExecutable {
       case 4: return { type: 16, id: 0x10000001, iv: this.#address(0x1462fd470n, 16) };
       default: throw new Error('Unsupported RPF9 directory mode.');
     }
+  }
+
+  verifyHeaderSignature(directory, record) {
+    this.#headerKey ??= createPublicKey({key:this.#address(0x1466fd4b0n,294),format:'der',type:'spki'});
+    const signatureStart=record+4;
+    const signatureEnd=signatureStart+256;
+    // Verify the first-transform header. The eight-byte header ID and the
+    // signature itself are excluded. PKCS#1 hashes the resulting digest again.
+    const digest=createHash('sha256').update(directory.subarray(0,16))
+      .update(directory.subarray(24,signatureStart)).update(directory.subarray(signatureEnd)).digest();
+    return verify('sha256',digest,{key:this.#headerKey,padding:constants.RSA_PKCS1_PADDING},
+      directory.subarray(signatureStart,signatureEnd));
   }
 
   #blockDecoder(id, type) {
@@ -391,6 +404,7 @@ export function openArchive(executable, path, start = 0, length, options = {}) {
       split >= HEADER_SIZE && split <= directoryEnd, 'Archive header contains invalid directory bounds.');
     requireFormat(hasByteRange(availableRanges,start,directoryEnd), 'The archive directory has not downloaded yet.');
     const data = bytesAt(fd, start, directoryEnd);
+    const headerHash = createHash('sha256').update(data).digest('hex');
     const pointerCount = header.readUInt16LE(0x1a);
     const parameterSize = header.readUInt32LE(0x1c);
     const headerSpanTail = header.readUInt32LE(0x30);
@@ -413,6 +427,14 @@ export function openArchive(executable, path, start = 0, length, options = {}) {
       if (encrypted & 1) prefixSpans.push({ start: parameterStart, length: parameterSize - headerSpanTail });
       executable.decrypt(data, prefixSpans, executable.headerCipher(encrypted));
     }
+    const signaturePointer = findExtension(data, pointerCount, HEADER_SIZE, parameterStart, 6);
+    requireFormat(encrypted !== 9 || signaturePointer !== null, 'Archive header signature is missing.');
+    if (signaturePointer !== null) {
+      requireFormat(signaturePointer >= parameterStart && signaturePointer + 260 <= primaryEnd &&
+        data.readUInt32LE(signaturePointer) === 0x00010001, 'Archive header has an unsupported signature record.');
+      requireFormat(executable.verifyHeaderSignature(data,signaturePointer), 'Archive header signature verification failed.');
+    }
+    const headerSignature = signaturePointer === null ? 'unsigned' : 'verified';
     const cipherPointer = findExtension(data, pointerCount, HEADER_SIZE, parameterStart, 1);
     if (cipherPointer !== null) {
       requireFormat(cipherPointer >= parameterStart && cipherPointer + 22 <= primaryEnd,
@@ -510,7 +532,7 @@ export function openArchive(executable, path, start = 0, length, options = {}) {
         'Payload length crosses another entry or the archive boundary.');
     }
     // Keep all game paths read-only and reference the same validated extent on extraction.
-    return { path, name: basename(path), start, size, rowCount, rows, directoryEnd, trailer, identity,
+    return { path, name: basename(path), start, size, rowCount, rows, directoryEnd, trailer, identity, headerHash, headerSignature,
       logicalSize, availableRanges };
   } finally {
     closeSync(fd);

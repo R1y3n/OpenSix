@@ -12,7 +12,7 @@ index 5861988..5649b1c 100644
          let fc = s.chunks.iter().find(|c| (c.kind == CH_FORMAT || c.kind == CH_FORMAT_ALT) && c.size >= 20).cloned();
          if let Some(c) = fc {
 diff --git a/crates/sixng-core/src/drawable.rs b/crates/sixng-core/src/drawable.rs
-index d14a061..3746958 100644
+index d14a061..8b732bf 100644
 --- a/crates/sixng-core/src/drawable.rs
 +++ b/crates/sixng-core/src/drawable.rs
 @@ -99,7 +99,8 @@ pub struct MeshBlobHeader {
@@ -54,7 +54,80 @@ index d14a061..3746958 100644
                  v.push(GfxBuffer {
                      struct_off: p as u64,
                      gfx_off: go as u64,
-@@ -1539,6 +1545,18 @@ mod dictionary_tests {
+@@ -455,7 +461,6 @@ pub fn model_bounds(r: &Resource, member: Option<&str>) -> Option<[[f32; 3]; 2]>
+ 
+ /// Keep only the assets referenced by one dictionary member and remap indices.
+ pub fn select_member(r: &Resource, info: &mut DrawableInfo, name: &str) -> anyhow::Result<()> {
+-    use std::collections::{BTreeSet, HashMap};
+     let index = info.members.iter().position(|n| n == name)
+         .ok_or_else(|| anyhow::anyhow!("no drawable member {name}"))?;
+     info.models.retain(|m| m.member == Some(index as u32));
+@@ -463,6 +468,56 @@ pub fn select_member(r: &Resource, info: &mut DrawableInfo, name: &str) -> anyho
+     let root = dictionary_members(r)[index].root;
+     info.bounds_raw = (0..8).map(|i| r.f32(root + 0x2c + i * 4)).collect();
+     info.bounds = model_bounds(r, Some(name));
++    scope_drawable(r, info, root);
++    Ok(())
++}
++
++/// Declared fragment child drawables with at least one supported model.
++/// Child table layout from rpf9-explorer's RageModelDecoder at af54933.
++pub fn fragment_members(r: &Resource, info: &DrawableInfo) -> Vec<(usize, usize)> {
++    if info.tag.as_deref() != Some("ft") || r.sys.len() < 0x32 {
++        return vec![];
++    }
++    let Some(primary) = r.sys_off(r.u64(0x18)) else { return vec![] };
++    let count = r.u16(0x30) as usize;
++    if !(2..=4096).contains(&count) || primary + (count - 1) * 0x110 + 0xb0 > r.sys.len() {
++        return vec![];
++    }
++    let known: std::collections::HashSet<_> = info.models.iter()
++        .filter_map(|model| model.struct_off.checked_sub(8).map(|offset| offset as usize)).collect();
++    (0..count).filter_map(|i| {
++        let root = primary + i * 0x110;
++        (0..4).filter_map(|lod| lod_models(r, root, lod)).flatten()
++            .any(|offset| known.contains(&offset)).then_some((i, root))
++    }).collect()
++}
++
++pub fn select_fragment(r: &Resource, info: &mut DrawableInfo, root: usize) -> anyhow::Result<()> {
++    let mut originals = std::collections::HashMap::new();
++    for model in std::mem::take(&mut info.models) {
++        if let Some(offset) = model.struct_off.checked_sub(8) {
++            originals.entry(offset as usize).or_insert(model);
++        }
++    }
++    for lod in 0..4 {
++        for offset in lod_models(r, root, lod).into_iter().flatten() {
++            if let Some(model) = originals.get(&offset) {
++                let mut model = model.clone();
++                model.lod = lod;
++                model.part = false;
++                info.models.push(model);
++            }
++        }
++    }
++    anyhow::ensure!(!info.models.is_empty(), "Fragment drawable has no supported models");
++    info.bounds = bounds_at(r, root);
++    info.bounds_raw = (0..8).map(|i| r.f32(root + 0x2c + i * 4)).collect();
++    scope_drawable(r, info, root);
++    Ok(())
++}
++
++fn scope_drawable(r: &Resource, info: &mut DrawableInfo, root: usize) {
++    use std::collections::{BTreeSet, HashMap};
+     // Model shader indices are local to the member's shader group. The
+     // resource-wide longest run may belong to a different drawable.
+     if let Some(array) = r.sys_off(r.u64(root + 0x10)).and_then(|s| r.sys_off(r.u64(s + 0x10))) {
+@@ -493,7 +548,6 @@ pub fn select_member(r: &Resource, info: &mut DrawableInfo, name: &str) -> anyho
+         (0..s.param_hashes.len()).filter_map(move |i| slots.and_then(|at| r.sys_off(r.u64(at + 8 * i))).map(|at| at as u64))
+     }).collect();
+     info.embedded_textures.retain(|t| embedded_offsets.contains(&t.struct_off) || hashes.contains(&crate::meta7a::joaat(&t.name)));
+-    Ok(())
+ }
+ 
+ pub fn describe(r: &Resource) -> DrawableInfo {
+@@ -1539,6 +1593,18 @@ mod dictionary_tests {
  mod meshlet_tests {
      use super::*;
  
@@ -74,9 +147,18 @@ index d14a061..3746958 100644
      fn meshlets_with_32_bit_counts() {
          // two meshlets; the second one's remap start (65,636) wraps in its
 diff --git a/crates/sixng-core/src/export.rs b/crates/sixng-core/src/export.rs
-index 258ea06..371f9bd 100644
+index 258ea06..0947e9b 100644
 --- a/crates/sixng-core/src/export.rs
 +++ b/crates/sixng-core/src/export.rs
+@@ -554,7 +554,7 @@ fn roof_animation(a: &ArchiveInfo, name: &str, joints: &[crate::gltf::Joint]) ->
+ /// A wheel bone that carries a wheel: `wheel_lf`, `wheel_rm1`, and the inner
+ /// wheel of a dual pair, `wheel_lr_inr`. Not the helpers (`wheel_turn_lf`,
+ /// `wheel_lr_drive`, `wheel_parent_lr`).
+-fn is_wheel_mount(name: &str) -> bool {
++pub fn is_wheel_mount(name: &str) -> bool {
+     let n = name.to_ascii_lowercase();
+     let Some(r) = n.strip_prefix("wheel_") else { return false };
+     let r = r.strip_suffix("_inr").unwrap_or(r);
 @@ -1180,7 +1180,7 @@ fn material_uv_fit(lod_groups: &[Vec<crate::gltf::NodeGroup>], shader: usize) ->
      crate::material::uv_fit(lod.into_iter().flatten().flat_map(|n| &n.prims).filter(|p| p.material == Some(shader)))
  }

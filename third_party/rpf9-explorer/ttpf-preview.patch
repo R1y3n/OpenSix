@@ -1,0 +1,30 @@
+diff --git a/Core/TtpfReader.cs b/Core/TtpfReader.cs
+index ba37f90..96f6c41 100644
+--- a/Core/TtpfReader.cs
++++ b/Core/TtpfReader.cs
+@@ -161,11 +161,21 @@ public static class TtpfReader
+     public static RageTexturePixels DecodeTexturePixels(string path, int index, int slice, bool allowProvisional, BcpackHistory? history, CancellationToken cancellationToken = default)
++        => DecodePixels(path, index, null, slice, allowProvisional, history, cancellationToken);
++
++    public static RageTexturePixels DecodeTexturePixelsAtMip(string path, int index, int mip, int slice, CancellationToken cancellationToken = default)
++        => DecodePixels(path, index, mip, slice, false, null, cancellationToken);
++
++    private static RageTexturePixels DecodePixels(string path, int index, int? mip, int slice, bool allowProvisional, BcpackHistory? history, CancellationToken cancellationToken)
+     {
+         var source = ReadIndex(path, cancellationToken); var native = Select(source, index); var t = native.Info;
+-        int sliceCount = t.Dimension == 3 ? Math.Max(1, t.Depth >> t.PreviewMipLevel) : t.Depth;
++        int level = mip ?? t.PreviewMipLevel;
++        if (level < t.BaseMipLevel || level >= t.BaseMipLevel + t.Mips) throw new ArgumentOutOfRangeException(nameof(mip));
++        int width = Math.Max(1, t.Width >> level), height = Math.Max(1, t.Height >> level);
++        int sliceCount = t.Dimension == 3 ? Math.Max(1, t.Depth >> level) : t.Depth;
+         if ((uint)slice >= sliceCount) throw new ArgumentOutOfRangeException(nameof(slice));
+-        if (!t.CanPreview) throw new NotSupportedException(t.Limitation ?? "No supported mip fits the preview output limit.");
++        if (!t.CanExtract || (long)width * height > 16 * 1024 * 1024 || t.DxgiFormat is 81 or 84)
++            throw new NotSupportedException(t.Limitation ?? "This mip cannot be decoded as a preview.");
+         using var input = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Write | FileShare.Delete);
+         if (input.Length != source.Info.SourceLength) throw new IOException("The texture pool changed while it was being read.");
+-        byte[] linear = ReadMip(input, source, native, t.PreviewMipLevel, slice, new(), cancellationToken, allowProvisional, history);
+-        return RageTextureDecoder.DecodeLinearTexturePixels(linear, t.PreviewWidth, t.PreviewHeight, t.DxgiFormat);
++        byte[] linear = ReadMip(input, source, native, level, slice, new(), cancellationToken, allowProvisional, history);
++        return RageTextureDecoder.DecodeLinearTexturePixels(linear, width, height, t.DxgiFormat);
+     }

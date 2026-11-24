@@ -4,6 +4,8 @@ target/
 dist/
 release/
 /app/worker/
+/native/texture-pools/bin/
+/native/texture-pools/obj/
 /app/assets/ui.bundle.mjs*
 /app/assets/OpenSix.ico
 /app/assets/window.png

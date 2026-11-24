@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { dispatch, prepareExport, preparePreviewExport } from './workspace.mjs';
 import { assetPreviewFile, clearAssetPreviews } from './asset-preview.mjs';
 import { withFbxExport } from './fbx-export.mjs';
+import { runCli } from './cli.mjs';
+import { stopMovie } from './bink-playback.mjs';
 
 const APP_URL = 'opensix://app/';
 const bundle = dirname(fileURLToPath(import.meta.url));
@@ -79,7 +81,7 @@ function matchesSource(path, source) {
 }
 
 async function save(archive, entry, stored) {
-  return saveFile(prepareExport(archive,entry,stored),stored ? 'Save stored bytes' : 'Extract file');
+  return saveFile(await prepareExport(archive,entry,stored),stored ? 'Save stored bytes' : 'Extract file');
 }
 
 async function savePreview(id, name) {
@@ -138,6 +140,7 @@ async function choosePath(kind) {
       filters:[{name:'Windows executables',extensions:['exe']}] },
     archive: { title:'Open RPF9 archive', properties:['openFile'],
       filters:[{name:'RPF9 archives',extensions:['rpf','rpf9']}] },
+    pool: { title:'Open texture pool', properties:['openFile'], filters:[{name:'Texture pools',extensions:['ttpf']}] },
     folder: { title:'Open folder of RPF9 archives', properties:['openDirectory'] },
   };
   if (!Object.hasOwn(choices,kind)) throw new Error('Invalid file picker.');
@@ -164,6 +167,7 @@ export async function createWindow(show = true) {
     },
   });
   window.removeMenu();
+  window.once('closed',()=>stopMovie());
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => {
     if (url !== APP_URL) event.preventDefault();
@@ -186,7 +190,10 @@ export const ready = app.whenReady().then(() => {
   handle('opensix:choose', choosePath);
 });
 
-if (process.argv.includes('--desktop-fixture') && !app.isPackaged) {
+const cliFlag=process.argv.indexOf('--cli');
+if (cliFlag>=0) {
+  ready.then(()=>runCli(process.argv.slice(cliFlag+1))).then(code=>app.exit(code));
+} else if (process.argv.includes('--desktop-fixture') && !app.isPackaged) {
   // The development-only harness creates the window after the same setup.
 } else {
   ready.then(() => createWindow()).catch(error => {

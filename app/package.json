@@ -33,6 +33,7 @@
     },
     "files": [
       "main.mjs",
+      "cli.mjs",
       "preload.cjs",
       "workspace.mjs",
       "available-ranges.mjs",
@@ -42,6 +43,7 @@
       "index.html",
       "style.css",
       "asset-preview.mjs",
+      "bink-playback.mjs",
       "fbx-export.mjs",
       "assets/ui.bundle.mjs",
       "assets/ui.bundle.mjs.LEGAL.txt",
@@ -53,6 +55,10 @@
     "extraResources": [
       { "from": "worker/opensix-preview.exe", "to": "opensix-preview.exe" },
       { "from": "worker/opensix-fbx.exe", "to": "opensix-fbx.exe" },
+      { "from": "worker/opensix-pool.exe", "to": "opensix-pool.exe" },
+      { "from": "worker/DotNet.LICENSE.txt", "to": "licenses/DotNet.LICENSE.txt" },
+      { "from": "worker/DotNet.NOTICES.txt", "to": "licenses/DotNet.NOTICES.txt" },
+      { "from": "../third_party/rpf9-explorer/NOTICE.md", "to": "licenses/Rpf9Explorer.md" },
       { "from": "worker/Assimp.LICENSE.txt", "to": "licenses/Assimp.txt" }
     ],
     "win": {

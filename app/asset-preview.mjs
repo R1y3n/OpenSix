@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { delimiter, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -11,13 +11,16 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 const outputs = new Map();
 const formats = new Map([
   ['.glb','model/gltf-binary'],['.png','image/png'],['.opus','audio/ogg'],
-  ['.wav','audio/wav'],['.xma','application/octet-stream'],
+  ['.wav','audio/wav'],['.xma','application/octet-stream'],['.json','application/json'],['.dds','image/vnd-ms.dds'],
 ]);
 
 export function resourceKind(extension, bytes) {
   if (['zdr','zft','zdd'].includes(extension)) return 'model';
   if (['zbn','zbd'].includes(extension)) return 'collision';
   if (extension==='ztd') return 'textures';
+  if (extension==='zcd') return 'clips';
+  if (bytes?.toString('ascii',16,20)==='0DRP') return 'metadata';
+  if (bytes?.toString('ascii',0,4)==='PSIN') return 'psin';
   if (['awc','zawc','adat'].includes(extension) || bytes?.toString('ascii',0,4)==='ADAT') return 'bank';
   return null;
 }
@@ -63,17 +66,28 @@ function embedModelImages(folder) {
   writeFileSync(path,Buffer.concat([header,json,Buffer.alloc(aligned(json.length)-json.length,32),bin,...data]));
 }
 
-export async function buildAssetPreview(request, bytes) {
-  const worker = process.resourcesPath && existsSync(join(process.resourcesPath,'opensix-preview.exe'))
-    ? join(process.resourcesPath,'opensix-preview.exe')
-    : join(root,'worker','opensix-preview.exe');
+export async function buildAssetPreview(request, bytes, clip, parts=[]) {
+  const name = request.kind.startsWith('pool') || request.kind==='wardrobe' ? 'opensix-pool.exe' : 'opensix-preview.exe';
+  const worker = process.resourcesPath && existsSync(join(process.resourcesPath,name))
+    ? join(process.resourcesPath,name)
+    : join(root,'worker',name);
   const folder = mkdtempSync(join(tmpdir(),'opensix-view-'));
   try {
-    writeFileSync(join(folder,'entry.bin'),bytes);
+    if (bytes) writeFileSync(join(folder,'entry.bin'),bytes);
+    if (clip) writeFileSync(join(folder,'clip.bin'),clip);
+    for (const [index,part] of parts.entries()) writeFileSync(join(folder,'part-'+index+'.bin'),part);
     writeFileSync(join(folder,'request.json'),JSON.stringify(request));
-    const {stdout} = await execute(worker,[folder],{windowsHide:true,timeout:120_000,maxBuffer:4*1024*1024});
+    const maxBuffer = request.kind==='poolIndex' ? 64*1024*1024 : 4*1024*1024;
+    const {stdout} = await execute(worker,[folder],{windowsHide:true,timeout:120_000,maxBuffer});
     const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
+    if (result.type==='poolIndex' || result.type==='unrecognized') {
+      rmSync(folder,{recursive:true,force:true});
+      return result;
+    }
     if (result.type==='model') embedModelImages(folder);
+    if (result.type==='bank' && result.tracks.some(track=>track.file==='track.xma')) {
+      await addXmaPlayback(folder,result);
+    }
     const id = randomBytes(16).toString('hex');
     outputs.set(id,folder);
     while (outputs.size>5) removePreview(outputs.keys().next().value);
@@ -81,6 +95,23 @@ export async function buildAssetPreview(request, bytes) {
   } catch (error) {
     rmSync(folder,{recursive:true,force:true});
     throw new Error(error.stderr?.toString().trim() || error.message);
+  }
+}
+
+async function addXmaPlayback(folder, result) {
+  const paths = (process.env.PATH ?? '').split(delimiter)
+    .filter(path=>isAbsolute(path)).map(path=>join(path,'ffmpeg.exe'));
+  const ffmpeg = [process.env.OPENSIX_FFMPEG,...paths].find(path=>path && isAbsolute(path) && existsSync(path));
+  if (!ffmpeg) { result.note='Install FFmpeg or set OPENSIX_FFMPEG to play XMA2.'; return; }
+  const args = ['-nostdin','-hide_banner','-loglevel','error','-protocol_whitelist','file,pipe','-f','wav',
+    '-i',join(folder,'track.xma'),'-map','0:a:0','-vn','-c:a','pcm_s16le','-y',
+    '-t','120','-fs','134217728',join(folder,'decoded.wav')];
+  try {
+    await execute(ffmpeg,args,{windowsHide:true,timeout:45_000,maxBuffer:128*1024});
+    if (statSync(join(folder,'decoded.wav')).size < 80) throw new Error('Empty PCM output');
+    result.tracks.push({name:'XMA2 decoded preview',file:'decoded.wav',playable:true});
+  } catch {
+    result.note='FFmpeg could not decode this XMA2 stream.';
   }
 }
 
