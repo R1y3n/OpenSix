@@ -8,6 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { dispatch, prepareExport, preparePreviewExport } from './workspace.mjs';
 import { assetPreviewFile, clearAssetPreviews } from './asset-preview.mjs';
+import { withFbxExport } from './fbx-export.mjs';
 
 const APP_URL = 'opensix://app/';
 const bundle = dirname(fileURLToPath(import.meta.url));
@@ -81,10 +82,19 @@ async function save(archive, entry, stored) {
   return saveFile(prepareExport(archive,entry,stored),stored ? 'Save stored bytes' : 'Extract file');
 }
 
-async function saveFile(file, title) {
+async function savePreview(id, name) {
+  if (name === 'model.fbx') {
+    return withFbxExport(preparePreviewExport(id, 'model.glb'), file =>
+      saveFile(file, 'Export FBX', [{ name: 'Autodesk FBX', extensions: ['fbx'] }]));
+  }
+  return saveFile(preparePreviewExport(id, name), 'Export decoded asset');
+}
+
+async function saveFile(file, title, filters) {
   const picked = await dialog.showSaveDialog(window, {
     title,
     defaultPath: join(app.getPath('downloads'), file.name),
+    filters,
     properties: ['showOverwriteConfirmation'],
   });
   if (picked.canceled || !picked.filePath) return null;
@@ -110,7 +120,7 @@ async function saveFile(file, title) {
     });
     await pipeline(Buffer.isBuffer(input) ? [input] : input, limit, writer);
     if (statSync(temp).size !== file.length) throw new Error('The file ended before all bytes were written.');
-    file.verify();
+    await file.verify();
     if (file.sources.some(source => matchesSource(destination, source))) {
       throw new Error('The destination now points to an open archive or the game executable.');
     }
@@ -172,7 +182,7 @@ export const ready = app.whenReady().then(() => {
   protocol.handle('opensix', response);
   handle('opensix:request', dispatch);
   handle('opensix:save', save);
-  handle('opensix:save-preview',(id,name)=>saveFile(preparePreviewExport(id,name),'Export decoded asset'));
+  handle('opensix:save-preview',savePreview);
   handle('opensix:choose', choosePath);
 });
 

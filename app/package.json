@@ -42,6 +42,7 @@
       "index.html",
       "style.css",
       "asset-preview.mjs",
+      "fbx-export.mjs",
       "assets/ui.bundle.mjs",
       "assets/ui.bundle.mjs.LEGAL.txt",
       "icon.svg",
@@ -50,7 +51,9 @@
       "assets/window.png"
     ],
     "extraResources": [
-      { "from": "worker/opensix-preview.exe", "to": "opensix-preview.exe" }
+      { "from": "worker/opensix-preview.exe", "to": "opensix-preview.exe" },
+      { "from": "worker/opensix-fbx.exe", "to": "opensix-fbx.exe" },
+      { "from": "worker/Assimp.LICENSE.txt", "to": "licenses/Assimp.txt" }
     ],
     "win": {
       "target": [

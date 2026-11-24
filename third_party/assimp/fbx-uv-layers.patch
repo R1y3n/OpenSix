@@ -1,0 +1,21 @@
+diff --git a/code/AssetLib/FBX/FBXExporter.cpp b/code/AssetLib/FBX/FBXExporter.cpp
+index 353140e..22e620c 100644
+--- a/code/AssetLib/FBX/FBXExporter.cpp
++++ b/code/AssetLib/FBX/FBXExporter.cpp
+@@ -1294,8 +1294,6 @@ void FBXExporter::WriteObjects () {
+           const auto num_uv = static_cast<size_t>(m->GetNumUVChannels());
+           uv_indices.resize(std::max(num_uv, uv_indices.size()));
+           uv_data.resize(std::max(num_uv, uv_data.size()));
+-          std::map<aiVector3D, int32_t> index_by_uv;
+-
+           // uvs, if any
+           for (size_t uvi = 0; uvi < m->GetNumUVChannels(); uvi++) {
+             const auto nc = m->mNumUVComponents[uvi];
+@@ -1321,6 +1319,7 @@ void FBXExporter::WriteObjects () {
+                 ASSIMP_LOG_WARN(err.str());
+             }
+ 
++            std::map<aiVector3D, int32_t> index_by_uv;
+             int32_t index = static_cast<int32_t>(uv_data[uvi].size()) / nc;
+             for (size_t fi = 0; fi < m->mNumFaces; fi++) {
+               const aiFace &f = m->mFaces[fi];

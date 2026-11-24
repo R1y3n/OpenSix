@@ -108,6 +108,7 @@ export function renderAsset(parent,result,select,save,onError) {
     parent.append(element('p',result.triangles.toLocaleString()+' triangles'));
     const cleanup=modelViewport(parent,urlFor(result.id,result.file),onError);
     exportButton(parent,'Save GLB',result.file,save);
+    exportButton(parent,'Save FBX','model.fbx',save);
     return cleanup;
   }
   if (result.type==='textures') {

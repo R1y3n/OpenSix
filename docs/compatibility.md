@@ -17,6 +17,7 @@ To check a local copy in PowerShell, run `Get-FileHash -Algorithm SHA256 -Litera
 - Filename matching uses available local path references and user-supplied candidates. The original name of every entry may not be recoverable. Hashes remain visible in the entry details and are searchable in the file list.
 - The 3D viewer handles supported drawable resource variants, including supported LODs and some dictionary members. Material and texture coverage varies. Some drawable variants fail to produce renderable geometry.
 - Supported `.zbn` collision bounds can be viewed in 3D and exported to GLB. `.zbd` variants still need sample coverage.
+- Model previews can be exported as GLB or binary FBX. FBX embeds textures available in the preview and uses FBX material properties.
 - Texture dictionaries expose supported textures and mip levels. Some descriptors and encodings cannot be decoded.
 - Supported Opus and PCM streams play in the app. XMA2 has raw track export. Audio support varies by bank layout and codec.
 - Some entries can only be saved as stored bytes when their compression or cipher is unsupported.
