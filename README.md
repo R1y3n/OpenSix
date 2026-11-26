@@ -2,15 +2,24 @@
 
 OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Point it at your game folder once and it shows the full folder and archive hierarchy, searches every nested RPF9, and previews or extracts assets without launching the game. OpenSix reads your files in place.
 
-**[Download OpenSix 1.4.0 for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [All releases](https://github.com/cyberpulse2077/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
+**[Download OpenSix 1.5.0 for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [All releases](https://github.com/cyberpulse2077/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
 
 ![OpenSix decoding a diner scene from GTA VI’s UI texture pool](docs/images/archive-browser.png)
+
+## Characters
+
+Search a name, choose **Preview and export**, and OpenSix assembles the character from the game's own drawables and textures. Lucia and Jason below are the complete cutscene models (`cs_lucia`, `cs_jason`) in the Characters dialog. Their modular story models, dressed in the outfits that the game stores for them, are in the same dialog. Save any of them as GLB or FBX.
+
+<p>
+  <img src="docs/images/character-lucia.png" alt="OpenSix previewing the assembled cs_lucia model in the Characters dialog" width="49%">
+  <img src="docs/images/character-jason.png" alt="OpenSix previewing the assembled cs_jason model in the Characters dialog" width="49%">
+</p>
 
 ## What it does
 
 - **Open your game folder once.** OpenSix finds an installed copy, remembers your choice, and opens straight into the game's folders, archives and nested archives on every later launch. Use the tree, back, forward, up and breadcrumb navigation, and right-click any entry to preview, extract, export a model or copy its path.
 - **Search the whole game.** A persistent index covers every entry in every nested archive. Search file names, partial names, `*` and `?` wildcards, hashes (`hash:ab0d9aed`) and the drawable labels stored inside models, and filter by type. Results show their complete archive path. Names that match an archive hash are marked as verified or as coming from an embedded model label. Entries without a recovered name show their hash.
-- **Find and export characters.** Search a name such as `lucia` or `jason` and choose **Preview and export**. OpenSix groups the character's drawables, assembles them on one skeleton with their textures, and exports GLB or FBX.
+- **Find and export characters.** Search a name such as `lucia` or `jason` and choose **Preview and export**. OpenSix groups the character's drawables, dresses a modular character in one of the outfits that the game stores for it, assembles the parts on the game's ped skeleton with their textures and tints, and exports GLB or FBX.
 - **Browse RPF9 archives.** Open a file or scan a folder, drill into nested archives, and see entry sizes, offsets, hashes, compression, and encryption details. OpenSix checks signed headers and rejects incomplete archives.
 - **Find entries by name, hash, or model label.** Import a text list of paths to resolve more names. Embedded model labels are searchable, and entries with an unresolved path are still available by hash.
 - **Extract files.** Save decoded data when the storage format is supported, or save the original stored bytes. Search and batch-extract from the command line with stable entry IDs and JSON Lines reports.

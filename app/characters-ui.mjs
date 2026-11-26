@@ -56,13 +56,13 @@ export function setupCharacters({ lib, notify, navigate }) {
     } catch (error) { if (current === ticket) say(error.message, true); }
   }
 
-  async function choose(prefix) {
+  async function choose(prefix, outfit = null) {
     say();
     clearPreview();
     for (const item of list.children) item.setAttribute('aria-selected', String(item.dataset?.prefix === prefix));
     partsHost.replaceChildren(node('p', 'Reading parts…', 'quiet'));
     try {
-      const data = await lib('character-parts', { prefix });
+      const data = await lib('character-parts', { prefix, outfit });
       current = { prefix, data };
       drawParts();
     } catch (error) { partsHost.replaceChildren(); say(error.message, true); }
@@ -74,9 +74,22 @@ export function setupCharacters({ lib, notify, navigate }) {
     partsHost.append(node('h3', prefix));
     const locations = [...new Set(data.parts.map(part => part.location))];
     partsHost.append(node('p', 'Stored in ' + locations.join(', '), 'quiet'));
+    if (data.outfits?.length) {
+      // The character's own wardrobe kit lists the outfits that the game defines for it.
+      const field = node('label', undefined, 'outfit-field');
+      field.append(node('span', 'Outfit'));
+      const choice = node('select');
+      choice.id = 'character-outfit';
+      choice.setAttribute('aria-label', 'Outfit');
+      data.outfits.forEach((outfit, number) => choice.append(new Option((number + 1) + ' of ' + data.outfits.length + ' · ' + outfit.label, String(outfit.id))));
+      choice.value = String(data.outfit);
+      choice.addEventListener('change', () => choose(prefix, Number(choice.value)));
+      field.append(choice);
+      partsHost.append(field, node('p', 'These outfits come from the wardrobe data that the game stores for this character. The first one is the look the game defines most often.', 'quiet'));
+    }
     if (data.legacy) partsHost.append(node('p', 'This character has a complete cutscene body and head. They are selected by default.', 'quiet'));
     else if (data.parts.some(part => part.tintable)) {
-      partsHost.append(node('p', 'Most garments store no colour: the game sets it at run time. Choose a fabric colour for them below. Skin parts take their tone from the head texture.', 'quiet'));
+      partsHost.append(node('p', 'Garments take the colour that the outfit gives them. Where it names none, choose a fabric colour below. Skin parts take their tone from the head texture.', 'quiet'));
     }
     const groups = new Map();
     for (const part of data.parts) (groups.get(part.group) ?? groups.set(part.group, []).get(part.group)).push(part);
@@ -144,7 +157,7 @@ export function setupCharacters({ lib, notify, navigate }) {
       for (const choice of partsHost.querySelectorAll('select[data-row-index]')) variants[choice.dataset.rowIndex] = Number(choice.value);
       const colours = {};
       for (const choice of partsHost.querySelectorAll('select[data-fabric-row]')) colours[choice.dataset.fabricRow] = choice.value;
-      const output = await lib('assemble-character', { prefix: current.prefix, rows, variants, colours });
+      const output = await lib('assemble-character', { prefix: current.prefix, rows, variants, colours, outfit: current.data.outfit });
       if (mine !== ticket) return;
       say();
       let result = output.result;

@@ -23,6 +23,17 @@ struct Request {
     appearance: Option<Appearance>,
     #[serde(default)]
     parts: Vec<AssemblyPart>,
+    // The shared ped skeletons (the `ambient_malebody` and `ambient_femalebody` fragments of packs.rpf), which ped clothing
+    // is skinned to. The host supplies them as files, because the worker has no index of packs.rpf.
+    #[serde(default)]
+    skeletons: Vec<SkeletonFile>,
+}
+
+#[derive(Deserialize)]
+struct SkeletonFile {
+    female: bool,
+    system_size: usize,
+    file: String,
 }
 
 #[derive(Deserialize)]
@@ -105,7 +116,19 @@ fn decode_drawable(archive_path: &Path, name: &str, index: Option<usize>, detail
         materials:built.materials,joints:built.joints,members,lods,lod,warnings:item.warnings})
 }
 
+fn install_skeletons(req: &Request, out: &Path) -> Result<()> {
+    for skeleton in &req.skeletons {
+        ensure!(skeleton.file.starts_with("part-") && skeleton.file.ends_with(".bin") && !skeleton.file.contains(['/', '\\']),
+            "Invalid shared skeleton file");
+        let resource = split_resource(fs::read(out.join(&skeleton.file))?, skeleton.system_size)?;
+        // A fragment without a usable skeleton leaves the clothing bound to its own bones, as before.
+        sixng_core::pedskel::install(skeleton.female, &resource);
+    }
+    Ok(())
+}
+
 fn model(req: &Request, resource: &Resource, out: &Path) -> Result<Value> {
+    install_skeletons(req, out)?;
     let mut asset=decode_drawable(&req.archive,&req.name,req.index,req.detail,resource,out)?;
     if let Some(appearance)=&req.appearance { apply_appearance(&mut asset,&req.archive,appearance,out)?; }
     let DrawableAsset {title,label,mut groups,mut materials,mut joints,members,lods,lod,mut warnings} =
@@ -287,6 +310,25 @@ fn textures(req: &Request, resource: &Resource, out: &Path) -> Result<Value> {
     Ok(json!({"type":"textures","file":file,"items":items,"index":index,"detail":mip,"width":width,"height":height,"note":note}))
 }
 
+// The ped tint palettes (64 x 256 colour ramps, one row per colour) of a texture dictionary, untiled to RGBA8 files.
+// Clothing without a colour texture is coloured by sampling one of them at the garment's tint row.
+fn tint_palettes(resource: &Resource, out: &Path) -> Result<Value> {
+    use sixng_core::{meta7a::joaat, pedtint};
+    let wanted: std::collections::HashSet<u32> = pedtint::NAMES.iter().map(|name| joaat(name)).collect();
+    let mut items = Vec::new();
+    for texture in texture::find_textures(resource) {
+        let hash = joaat(&texture.name);
+        if !wanted.contains(&hash) || texture.dxgi_format != 29 || texture.mips != 1 { continue; }
+        let Some(raw) = resource.gfx.get(texture.data_off as usize..) else { continue };
+        let Some(rgba) = pedtint::untile(raw, texture.width, texture.height) else { continue };
+        let file = format!("palette-{hash:08x}.rgba");
+        fs::write(out.join(&file), &rgba)?;
+        items.push(json!({"hash":format!("{hash:08x}"),"name":texture.name,"width":texture.width,"height":texture.height,"file":file}));
+    }
+    ensure!(!items.is_empty(), "This dictionary has no ped tint palettes");
+    Ok(json!({"type":"tintPalettes","items":items}))
+}
+
 fn sound(req: &Request, data: &[u8], out: &Path) -> Result<Value> {
     let mut bank = audio::parse_header(data,0).context("Invalid GTA VI ADAT bank")?;
     ensure!(bank.size<=data.len() as u64,"Audio bank chunks exceed the asset size");
@@ -346,6 +388,7 @@ fn run() -> Result<Value> {
         "model" => model(&request,&resource,&out),
         "collision" => collision(&request,&resource,&out),
         "textures" => textures(&request,&resource,&out),
+        "tintPalettes" => tint_palettes(&resource,&out),
         "metadata" => inspect::metadata(&resource.sys,&out),
         "clips" => inspect::clips(&resource.sys,&out),
         _ => bail!("Unknown preview kind"),

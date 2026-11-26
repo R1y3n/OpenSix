@@ -297,7 +297,7 @@ async function libraryRoute(route, payload = {}) {
   if (route === 'search') return library.search(payload);
   if (route === 'open-result') return library.openResult(payload);
   if (route === 'characters') return library.listCharacters(payload.query);
-  if (route === 'character-parts') return library.characterParts(payload.prefix);
+  if (route === 'character-parts') return library.characterParts(payload.prefix, payload.outfit ?? null);
   if (route === 'assemble-character') return library.assembleCharacter(payload);
   throw new Error('Unknown library action.');
 }

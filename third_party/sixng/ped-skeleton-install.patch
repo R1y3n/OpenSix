@@ -1,0 +1,42 @@
+diff --git a/crates/sixng-core/src/pedskel.rs b/crates/sixng-core/src/pedskel.rs
+--- a/crates/sixng-core/src/pedskel.rs
++++ b/crates/sixng-core/src/pedskel.rs
+@@ -49,7 +49,12 @@ fn load_fragment(game_root: &Path, name: &str) -> Option<PedSkeleton> {
+     let ix = packs_index()?;
+     let e = ix.entries.iter().filter(|e| e.name.as_deref() == Some(name) && e.rtype.as_deref() == Some("ft")).max_by_key(|e| e.usize)?;
+     let r = Resource::load(&game_root.join("packs.rpf"), e).ok()?;
+-    let bones = find_skeleton(&r);
++    skeleton_of(name, &r)
++}
++
++/// The skeleton of a fragment, when it has one and every bone has a bind pose.
++fn skeleton_of(name: &str, r: &Resource) -> Option<PedSkeleton> {
++    let bones = find_skeleton(r);
+     if bones.is_empty() || bones.iter().any(|b| b.bind_matrix.is_none()) {
+         return None;
+     }
+@@ -57,12 +62,21 @@ fn load_fragment(game_root: &Path, name: &str) -> Option<PedSkeleton> {
+     Some(PedSkeleton { source: name.to_string(), bones, by_hash })
+ }
+ 
++static FEMALE: OnceLock<Option<PedSkeleton>> = OnceLock::new();
++static MALE: OnceLock<Option<PedSkeleton>> = OnceLock::new();
++
++/// Install the shared ped skeleton from the `ambient_femalebody` / `ambient_malebody` fragment that the caller already
++/// holds, for a host that has no work directory with an index of packs.rpf. Call it before the first `get`. Returns
++/// false when the fragment has no usable skeleton or a skeleton was already loaded.
++pub fn install(female: bool, r: &Resource) -> bool {
++    let Some(skeleton) = skeleton_of(source_name(female), r) else { return false };
++    (if female { &FEMALE } else { &MALE }).set(Some(skeleton)).is_ok()
++}
++
+ /// The shared ped skeleton (cached), or None when packs.rpf is not indexed
+ /// in the work directory or the fragment is missing.
+ pub fn get(game_root: &Path, female: bool) -> Option<&'static PedSkeleton> {
+-    static F: OnceLock<Option<PedSkeleton>> = OnceLock::new();
+-    static M: OnceLock<Option<PedSkeleton>> = OnceLock::new();
+-    let cell = if female { &F } else { &M };
++    let cell = if female { &FEMALE } else { &MALE };
+     cell.get_or_init(|| load(game_root, female)).as_ref()
+ }
+ 

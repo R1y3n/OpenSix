@@ -42,6 +42,12 @@ int wmain(int argc, wchar_t* argv[]) {
             material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
             metallic = std::clamp(metallic, 0.0f, 1.0f);
             roughness = std::clamp(roughness, 0.0f, 1.0f);
+            // glTF's specular factor (1 unless KHR_materials_specular sets it) is Blender's specular level 0.5. Blender reads
+            // the level from the FBX as SpecularFactor * 2, and the FBX exporter's default SpecularFactor of 1 would give 1.0.
+            float specular = 1.0f;
+            material->Get(AI_MATKEY_SPECULAR_FACTOR, specular);
+            const float specularFactor = 0.25f * std::clamp(specular, 0.0f, 1.0f);
+            material->AddProperty(&specularFactor, 1, AI_MATKEY_SPECULAR_FACTOR);
             const float reflectivity = metallic;
             // A shininess of zero would make the exporter write a Lambert material, so keep it just above zero.
             const float shininess = std::max(0.01f, std::pow(10.0f * (1.0f - roughness), 2.0f));
