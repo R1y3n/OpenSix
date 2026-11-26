@@ -77,12 +77,13 @@ dotnet publish "$root/native/texture-pools/OpenSix.Pools.csproj" \
   -o "$pool_build" --nologo
 cp "$pool_build/opensix-pool" "$worker/"
 runtime_root="${NUGET_PACKAGES:-$HOME/.nuget/packages}/microsoft.netcore.app.runtime.linux-x64"
-runtime_dir="$(find "$runtime_root" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | sort -V | tail -n 1)"
-if [[ -n "$runtime_dir" ]]; then
-  cp "$runtime_dir/LICENSE.TXT" "$worker/DotNet.LICENSE.txt"
-  cp "$runtime_dir/THIRD-PARTY-NOTICES.TXT" "$worker/DotNet.NOTICES.txt"
+runtime_license="$(find "$runtime_root" -type f -name LICENSE.TXT 2>/dev/null | sort -V | tail -n 1)"
+runtime_notices="$(find "$runtime_root" -type f -name THIRD-PARTY-NOTICES.TXT 2>/dev/null | sort -V | tail -n 1)"
+if [[ -n "$runtime_license" && -n "$runtime_notices" ]]; then
+  cp "$runtime_license" "$worker/DotNet.LICENSE.txt"
+  cp "$runtime_notices" "$worker/DotNet.NOTICES.txt"
 else
-  echo "Could not locate the .NET runtime license folder" >&2
+  echo "Could not locate the .NET runtime licenses under $runtime_root" >&2
   exit 1
 fi
 

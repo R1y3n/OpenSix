@@ -82,8 +82,11 @@ jobs:
           file app/worker/opensix-preview app/worker/opensix-pool \
             app/worker/opensix-fbx app/worker/6ixpack | grep -q ELF
 
-      - name: List packages
-        run: ls -lh app/release/
+      - name: Check packaged resources
+        run: |
+          ls -lh app/release/
+          tar -tf app/release/OpenSix-*-x64.tar.xz | grep -E \
+            'resources/(assets/ui.bundle.mjs|opensix-preview|opensix-pool|opensix-fbx|6ixpack|libopensix_bcpack\.so)$'
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4

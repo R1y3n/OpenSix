@@ -4,7 +4,8 @@ import { closeSync, existsSync, openSync, readFileSync, readSync } from 'node:fs
 import { isAbsolute, join } from 'node:path';
 import { nativeTool, resolveNativeTool } from './native-tools.mjs';
 
-const releaseHelperHash='1c0d56b22ed2600c9bf76fe1efc2463eaa19cd24015f665f2cec1f9d5b6a697e';
+const releaseHelperHash=(process.env.OPENSIX_BINK_PLAYER_SHA256 ??
+  '1c0d56b22ed2600c9bf76fe1efc2463eaa19cd24015f665f2cec1f9d5b6a697e').toLowerCase();
 let playback;
 
 export function isBink(header) {
