@@ -1,10 +1,15 @@
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { candidatePaths, joaatName32, murmurName64 } from './rpf9.mjs';
 
 const MAX_NAMES = 200_000;
-const verifiedScarlettNames = readFileSync(new URL('./assets/scarlett-verified-paths.txt',import.meta.url),'utf8');
+// This list is gitignored and optional: a source checkout or package can work
+// with embedded model labels and imported paths without it.
+const verifiedPathsUrl = new URL('./assets/scarlett-verified-paths.txt', import.meta.url);
+const verifiedScarlettNames = existsSync(verifiedPathsUrl)
+  ? readFileSync(verifiedPathsUrl, 'utf8')
+  : '';
 const normalizePath = value => value.trim().replaceAll('\\', '/').replace(/^[a-z][a-z0-9_]*:\//i, '');
 
 export class FilenameIndex {

@@ -105,6 +105,9 @@ echo "==> Electron UI and Linux packages"
   npm ci --ignore-scripts
   node ./node_modules/electron/install.js
   npm run build:ui
+  # Catch missing optional-asset reads before packaging: names.mjs used to
+  # crash at startup when the gitignored verified-paths list was absent.
+  node --input-type=module -e "await import('./names.mjs')"
   ./node_modules/.bin/electron-builder --linux --config electron-builder.linux.yml --publish never
 )
 

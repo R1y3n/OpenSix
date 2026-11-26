@@ -62,6 +62,8 @@ The entry point is [`scripts/build-linux.sh`](../scripts/build-linux.sh). It che
 
 The helpers are placed in `app/worker/` for source launches and copied into `resources/` by `electron-builder` for packaged launches. Linux uses extensionless helper names and `libopensix_bcpack.so`; Windows keeps `.exe` and `.dll`. The desktop app resolves the right name for the current platform through `app/native-tools.mjs`.
 
+`app/assets/scarlett-verified-paths.txt` is optional and gitignored. If you place that list in a source checkout, the Linux build packages it and OpenSix uses it for verified name matching. Without it, OpenSix still resolves names from embedded model labels and paths you import with **Archive → Import paths**.
+
 Bink 2 playback uses the pinned pure-Rust `bink2-decoder` linked into `opensix-preview`, so no Windows helper is needed. Bink 1 files still need an external verified rpf9-explorer v1.3 `bink-player` helper. XMA2 playback uses FFmpeg from `PATH` or `OPENSIX_FFMPEG` on either platform.
 
 To run a source checkout on a Linux machine after a build:
