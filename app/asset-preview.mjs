@@ -157,6 +157,11 @@ function removePreview(id) {
   if (folder) rmSync(folder,{recursive:true,force:true});
 }
 
+// The folder that holds a kept preview's files, for code that finishes a model after the decoder wrote it.
+export function previewFolder(id) {
+  return outputs.get(id)?.folder ?? null;
+}
+
 export function clearAssetPreviews() {
   for (const id of outputs.keys()) removePreview(id);
 }

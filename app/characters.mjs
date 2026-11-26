@@ -65,8 +65,43 @@ export function outfitOptions(parts, prefix) {
     if (!optional && slot && !chosen.has(group)) chosen.set(group, part.rowIndex);
     options.push({ ...part, group, label: rest, default: false });
   }
+  // One garment per body area: a full-body piece replaces top and bottom, and an outer layer replaces the top under it
+  // (two stacked garments overlap and show through each other).
   if (chosen.has('full')) { chosen.delete('top'); chosen.delete('bottom'); }
+  if (chosen.has('outer')) chosen.delete('top');
   for (const option of options) option.default = chosen.get(option.group) === option.rowIndex;
+  return options;
+}
+
+// ----- shared body skin -----
+// Modular peds are dressed over shared base-body parts that carry no character prefix: `hand_<fit>_...` is the arms and
+// hands, `feet_<fit>_...` the legs and feet. Garment-specific variants (`_tshirt_`, `_pants`, `_shorts`) leave out the
+// skin that the garment covers, so they do not show through it.
+export const fitOf = name => name.split('_').find(isFit) ?? null;
+
+export const skinGroupNames = { hand: 'hands', feet: 'feet skin' };
+
+export function isSkinName(name) {
+  return /^(hand|feet)_[mf][a-z][0-9]_/.test(name) && !name.includes('_fp');
+}
+
+// `parts` are the skin drawables of one fit, one entry per name; `top` and `bottom` are the chosen default garments.
+export function skinOptions(parts, top, bottom) {
+  const options = parts.map(part => ({ ...part, group: skinGroupNames[part.name.split('_')[0]], label: part.name, default: false }))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const pick = (kind, preferences) => {
+    const list = options.filter(option => option.name.startsWith(kind + '_'));
+    for (const word of preferences) {
+      const found = list.find(option => option.name.includes(word));
+      if (found) return found;
+    }
+    return list.find(option => !option.name.includes('_cull')) ?? list[0] ?? null;
+  };
+  const sleeve = top?.label.split('_').find(token => ['long', 'short', 'cap', 'mid', 'non'].includes(token));
+  const hands = pick('hand', sleeve && sleeve !== 'long' && sleeve !== 'non' ? ['_tshirt_', '_nude_full', '_full'] : ['_nude_full', '_full']);
+  const bottomKind = bottom?.label.startsWith('shorts') ? '_shorts' : bottom?.label.startsWith('pants') ? '_pants' : null;
+  const feet = pick('feet', bottomKind ? [bottomKind, '_nude_full', '_full'] : ['_nude_full', '_full']);
+  for (const option of [hands, feet]) if (option) option.default = true;
   return options;
 }
 

@@ -75,6 +75,9 @@ export function setupCharacters({ lib, notify, navigate }) {
     const locations = [...new Set(data.parts.map(part => part.location))];
     partsHost.append(node('p', 'Stored in ' + locations.join(', '), 'quiet'));
     if (data.legacy) partsHost.append(node('p', 'This character has a complete cutscene body and head. They are selected by default.', 'quiet'));
+    else if (data.parts.some(part => part.tintable)) {
+      partsHost.append(node('p', 'Most garments store no colour: the game sets it at run time. Choose a fabric colour for them below. Skin parts take their tone from the head texture.', 'quiet'));
+    }
     const groups = new Map();
     for (const part of data.parts) (groups.get(part.group) ?? groups.set(part.group, []).get(part.group)).push(part);
     for (const [group, parts] of groups) {
@@ -95,6 +98,15 @@ export function setupCharacters({ lib, notify, navigate }) {
           for (let i = 0; i < part.variants; i++) choice.append(new Option('Colour ' + (i + 1) + ' of ' + part.variants, String(i)));
           row.append(choice);
         } else if (part.variants === 1) row.append(node('small', 'textured'));
+        if (part.tintable) {
+          // The catalogue stores no colour for this garment: the game sets it at run time, so the viewer offers a choice.
+          const fabric = node('select');
+          fabric.setAttribute('aria-label', 'Fabric colour for ' + part.label);
+          fabric.dataset.fabricRow = String(part.rowIndex);
+          for (const colour of data.colours) fabric.append(new Option(colour.name, colour.id));
+          fabric.value = part.colour;
+          row.append(fabric);
+        }
         row.title = part.location + '/' + part.name;
         section.append(row);
       }
@@ -130,7 +142,9 @@ export function setupCharacters({ lib, notify, navigate }) {
     try {
       const variants = {};
       for (const choice of partsHost.querySelectorAll('select[data-row-index]')) variants[choice.dataset.rowIndex] = Number(choice.value);
-      const output = await lib('assemble-character', { prefix: current.prefix, rows, variants });
+      const colours = {};
+      for (const choice of partsHost.querySelectorAll('select[data-fabric-row]')) colours[choice.dataset.fabricRow] = choice.value;
+      const output = await lib('assemble-character', { prefix: current.prefix, rows, variants, colours });
       if (mine !== ticket) return;
       say();
       let result = output.result;

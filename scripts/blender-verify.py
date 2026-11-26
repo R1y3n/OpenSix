@@ -7,6 +7,7 @@ The script never touches the game folder. It reads the export, writes a JSON rep
 """
 import json
 import math
+import os
 import sys
 
 import bpy
@@ -59,16 +60,30 @@ report['texturedMeshes'] = sum(1 for m in report['meshes'] if m['textures'])
 
 if render_prefix and meshes:
     scene = bpy.context.scene
-    scene.render.engine = 'BLENDER_WORKBENCH'
     scene.render.resolution_x = 700
     scene.render.resolution_y = 900
-    shading = scene.display.shading
-    shading.light = 'STUDIO'
-    shading.color_type = 'TEXTURE'
     scene.render.film_transparent = False
     world = bpy.data.worlds.new('w')
     world.color = (0.12, 0.1, 0.18)
     scene.world = world
+    if os.environ.get('OPENSIX_RENDER') == 'cycles':
+        # Shows the material colour factors and textures together, as a viewer that shades the model would.
+        scene.render.engine = 'CYCLES'
+        scene.cycles.device = 'CPU'
+        scene.cycles.samples = 24
+        world.use_nodes = True
+        background = next(n for n in world.node_tree.nodes if n.type == 'BACKGROUND')
+        background.inputs[0].default_value = (0.35, 0.34, 0.42, 1)
+        background.inputs[1].default_value = 1.0
+        sun = bpy.data.objects.new('sun', bpy.data.lights.new('sun', 'SUN'))
+        sun.data.energy = 3.0
+        sun.rotation_euler = (math.radians(50), 0, math.radians(25))
+        scene.collection.objects.link(sun)
+    else:
+        scene.render.engine = 'BLENDER_WORKBENCH'
+        shading = scene.display.shading
+        shading.light = 'STUDIO'
+        shading.color_type = 'TEXTURE'
     center = (low + high) / 2
     size = max(high - low)
     camera_data = bpy.data.cameras.new('cam')

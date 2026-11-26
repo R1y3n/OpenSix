@@ -10,7 +10,12 @@ import { buildIndex, buildTextureIndex, classify, defaultThreads, fingerprint, h
 import { buildAssetPreview } from './asset-preview.mjs';
 import { decodeWardrobeCatalog, drawableVariants, taggedVariants } from './wardrobe-catalog.mjs';
 import { joaatName32 } from './rpf9.mjs';
-import { legacyLook, listCharacters, outfitOptions, outfitPrefix } from './characters.mjs';
+import { fitOf, isSkinName, legacyLook, listCharacters, outfitOptions, outfitPrefix, skinOptions } from './characters.mjs';
+import { finishAssembly, fabricColours, skinGroups, tintableGroups } from './ped-finish.mjs';
+
+const NO_TEXTURE = '0000000000000000';
+// A texture key that the catalogue names for this many states is the game's empty placeholder, not a colour.
+const PLACEHOLDER_STATES = 1000;
 
 export const EXECUTABLE_NAME = 'game_scarlett_master.exe';
 const EXECUTABLE_SIZE = 120181760;
@@ -522,7 +527,23 @@ export class Library {
       counts.set(part.name, (counts.get(part.name) ?? 0) + 1);
       (copies.get(part.name) ?? copies.set(part.name, []).get(part.name)).push(part.rowIndex);
     }
-    this.characterCache = { byPrefix, counts, copies, list: listCharacters(byPrefix) };
+    // Shared base-body skin (arms and hands, legs and feet) has no character prefix: one entry per name, by fit tag.
+    const skin = new Map();
+    for (const [rowIndex, entry] of index.labels) {
+      if (index.isArchive(rowIndex)) continue;
+      for (const label of entry.labels) {
+        const name = label.toLowerCase();
+        if (!isSkinName(name)) continue;
+        const fit = fitOf(name);
+        const named = skin.get(fit) ?? skin.set(fit, new Map()).get(fit);
+        const record = named.get(name) ?? named.set(name, { name, rowIndex, size: index.size[rowIndex] }).get(name);
+        const size = index.size[rowIndex];
+        if (size > record.size || (size === record.size && rowIndex < record.rowIndex)) { record.rowIndex = rowIndex; record.size = size; }
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+        (copies.get(name) ?? copies.set(name, []).get(name)).push(rowIndex);
+      }
+    }
+    this.characterCache = { byPrefix, counts, copies, skin, list: listCharacters(byPrefix) };
     return this.characterCache;
   }
 
@@ -706,7 +727,11 @@ export class Library {
     }
     try {
       const catalog = decodeWardrobeCatalog(await read(location.ref, location.row, true));
-      return { byHash: drawableVariants(catalog), byName: taggedVariants(catalog) };
+      const byHash = drawableVariants(catalog);
+      const uses = new Map();
+      for (const list of byHash.values()) for (const variant of list) uses.set(variant.albedo, (uses.get(variant.albedo) ?? 0) + 1);
+      const placeholders = new Set([...uses].filter(([key, count]) => count >= PLACEHOLDER_STATES).map(([key]) => key));
+      return { byHash, byName: taggedVariants(catalog), catalog, placeholders };
     } catch {
       return null;
     }
@@ -717,6 +742,8 @@ export class Library {
     if (!wardrobe) return [];
     const seen = new Set(), list = [];
     const add = variant => {
+      // The placeholder albedo would paint the garment black over its real fabric shade map, so it counts as no albedo.
+      if (wardrobe.placeholders?.has(variant.albedo)) variant = { ...variant, albedo: NO_TEXTURE };
       const key = variant.albedo + variant.normal + variant.extra;
       if (!seen.has(key)) { seen.add(key); list.push(variant); }
     };
@@ -726,7 +753,7 @@ export class Library {
   }
 
   async characterParts(prefix) {
-    const { byPrefix, counts, copies: copyRows } = this.#characters();
+    const { byPrefix, counts, copies: copyRows, skin } = this.#characters();
     const options = outfitOptions(byPrefix.get(prefix) ?? [], prefix);
     if (!options.length) fail('No drawable labels use the prefix ' + prefix + '.');
     const look = legacyLook(options);
@@ -742,29 +769,69 @@ export class Library {
           !other.option.label.includes('_alt_'));
         if (better) { defaults.delete(item.option.rowIndex); defaults.add(better.option.rowIndex); }
       }
+      // Under an outer layer the default top is a light underlayer (tee, tank top, bra). A hoodie or sweatshirt under a
+      // jacket would be a second jacket.
+      if (withVariants.some(({ option }) => defaults.has(option.rowIndex) && option.group === 'outer') &&
+          !withVariants.some(({ option }) => defaults.has(option.rowIndex) && option.group === 'top')) {
+        const tops = withVariants.filter(({ option }) => option.group === 'top' && !option.label.includes('_alt_') && !option.label.includes('holster'));
+        for (const word of ['tshirt', 'tanktop', 'bra', 'blouse', 'shirt']) {
+          const matches = tops.filter(({ option }) => option.label.startsWith(word));
+          const pick = matches.find(item => item.variants.some(variant => variant.albedo !== NO_TEXTURE)) ?? matches[0];
+          if (pick) { defaults.add(pick.option.rowIndex); break; }
+        }
+      }
+      // A modular character is dressed over the shared arms, hands, legs and feet, which the character's own labels do not list.
+      const available = skin.get(fitOf(options[0].name));
+      if (available) {
+        const chosen = group => withVariants.find(({ option }) => defaults.has(option.rowIndex) && option.group === group)?.option;
+        for (const option of skinOptions([...available.values()], chosen('outer') ?? chosen('top') ?? chosen('full'), chosen('bottom'))) {
+          withVariants.push({ option, variants: [] });
+          if (option.default) defaults.add(option.rowIndex);
+        }
+      }
     }
     return {
       prefix, legacy: Boolean(look), wardrobe: Boolean(wardrobe),
+      colours: fabricColours.list.map(({ id, name }) => ({ id, name })),
       parts: withVariants.map(({ option, variants }) => {
         const archive = index.archiveOf(option.rowIndex);
+        // Garments with no colour texture in the catalogue are coloured by the game at run time, so the viewer picks one.
+        const tintable = !look && tintableGroups.has(option.group) && variants.every(variant => variant.albedo === NO_TEXTURE);
         return {
           rowIndex: option.rowIndex, archive, row: option.rowIndex - index.archives[archive].rowStart, name: option.name,
           group: option.group, label: option.label, size: option.size, default: defaults.has(option.rowIndex),
-          copies: counts.get(option.name) ?? 1, variants: variants.length,
+          copies: counts.get(option.name) ?? 1, variants: variants.filter(variant => variant.albedo !== NO_TEXTURE).length,
+          tintable, colour: tintable ? fabricColours.defaultFor(option.label) : null,
           location: index.archiveTrail(archive).map(item => item.name).join('/'), ref: this.archiveRef(archive),
         };
       }),
     };
   }
 
-  async assembleCharacter({ prefix, rows, variants = {} }) {
+  // Assemble arbitrary archive rows (library row indexes) on one skeleton, without wardrobe textures.
+  async assembleRowIndexes(rowIndexes) {
+    const assembly = [];
+    for (const rowIndex of rowIndexes) {
+      const archive = this.index.archiveOf(rowIndex);
+      const mounted = await this.#mountRef(this.archiveRef(archive));
+      assembly.push({ archive: mounted.key, entry: rowIndex - this.index.archives[archive].rowStart, index: null, detail: null });
+    }
+    return workspace.assembleParts(assembly, null);
+  }
+
+  async assembleCharacter({ prefix, rows, variants = {}, colours = {} }) {
     const { parts } = await this.characterParts(prefix);
-    const wanted = rows?.length ? parts.filter(part => rows.includes(part.rowIndex)) : parts.filter(part => part.default);
-    if (!wanted.length) fail('Choose at least one part.');
+    const chosen = rows?.length ? parts.filter(part => rows.includes(part.rowIndex)) : parts.filter(part => part.default);
+    if (!chosen.length) fail('Choose at least one part.');
+    // The first part's meshes carry no part name in the model, so parts that are coloured afterwards (skin, fabric) go later.
+    const plain = part => !part.tintable && !skinGroups.has(part.group);
+    const wanted = [...chosen.filter(plain), ...chosen.filter(part => !plain(part))];
     const wardrobe = await this.#wardrobe();
     const { copies: copyRows } = this.#characters();
     const assembly = [];
     const textured = [];
+    const fabrics = [];
+    let head = null;
     for (const part of wanted) {
       const mounted = await this.#mountRef(this.archiveRef(part.archive));
       const entry = { archive: mounted.key, entry: part.row, index: null, detail: null };
@@ -772,12 +839,15 @@ export class Library {
       const choice = found[Math.min(Math.max(Number(variants[part.rowIndex]) || 0, 0), Math.max(found.length - 1, 0))];
       if (choice) {
         entry.appearance = { albedo: choice.albedo, normal: choice.normal, extra: choice.extra, palette: choice.palette.toString(16).padStart(8, '0') };
-        textured.push(part.name);
+        if (choice.albedo !== NO_TEXTURE || choice.normal !== NO_TEXTURE) textured.push(part.name);
+        if (part.group === 'head' && choice.albedo !== NO_TEXTURE && !part.label.endsWith('_eyes')) head ??= choice.albedo;
       }
+      if (part.tintable) fabrics.push({ name: part.name, colour: colours[part.rowIndex] ?? part.colour });
       assembly.push(entry);
     }
     const result = await workspace.assembleParts(assembly, null);
-    return { result, parts: wanted.map(part => part.name), textured };
+    const finished = finishAssembly(result.id, { head, fabrics, skin: wanted.filter(part => skinGroups.has(part.group)).map(part => part.name) });
+    return { result, parts: wanted.map(part => part.name), textured, ...finished };
   }
 }
 
