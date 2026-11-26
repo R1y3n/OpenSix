@@ -2,6 +2,8 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -28,6 +30,24 @@ int wmain(int argc, wchar_t* argv[]) {
             throw std::runtime_error(importer.GetErrorString());
         }
         std::unique_ptr<aiScene> scene(importer.GetOrphanedScene());
+        // glTF materials carry metallic and roughness. The FBX exporter writes metallic as ReflectionFactor and roughness
+        // as a Phong shininess exponent, which Blender reads back as metallic = ReflectionFactor and
+        // roughness = 1 - sqrt(shininess) / 10. The glTF importer's own shininess ((1 - roughness)^2 * 1000) and the
+        // exporter's default ReflectionFactor of 1 would make every material a near-mirror metal, so write the values
+        // that give the same metallic and roughness back.
+        for (unsigned i = 0; i < scene->mNumMaterials; ++i) {
+            aiMaterial* material = scene->mMaterials[i];
+            float metallic = 1.0f, roughness = 1.0f;
+            material->Get(AI_MATKEY_METALLIC_FACTOR, metallic);
+            material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
+            metallic = std::clamp(metallic, 0.0f, 1.0f);
+            roughness = std::clamp(roughness, 0.0f, 1.0f);
+            const float reflectivity = metallic;
+            // A shininess of zero would make the exporter write a Lambert material, so keep it just above zero.
+            const float shininess = std::max(0.01f, std::pow(10.0f * (1.0f - roughness), 2.0f));
+            material->AddProperty(&reflectivity, 1, AI_MATKEY_REFLECTIVITY);
+            material->AddProperty(&shininess, 1, AI_MATKEY_SHININESS);
+        }
         if (!scene->mMetaData) scene->mMetaData = new aiMetadata();
         // glTF world units are meters. FBX records centimeters per world unit.
         for (const char* key : {"UnitScaleFactor", "OriginalUnitScaleFactor"}) {

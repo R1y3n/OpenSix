@@ -53,6 +53,16 @@ for obj in meshes:
     })
 for arm in armatures:
     report['armatures'].append({'name': arm.name, 'bones': len(arm.data.bones)})
+def principled_values(material):
+    node = next((n for n in material.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None) if material.use_nodes else None
+    if not node:
+        return None
+    pick = lambda name: round(node.inputs[name].default_value, 3) if name in node.inputs else None
+    return {'roughness': pick('Roughness'), 'metallic': pick('Metallic'), 'specular': pick('Specular IOR Level')}
+
+# The values an importer gives each material. A shaded viewer shows a material with high metallic or low roughness as shiny.
+used_materials = {s.material for obj in meshes for s in obj.material_slots if s.material}
+report['materialValues'] = sorted({tuple(v.values()) for v in map(principled_values, used_materials) if v})
 report['images'] = sorted({(i.name, i.size[0], i.size[1]) for i in bpy.data.images if i.name != 'Render Result'})
 report['triangles'] = sum(m['triangles'] for m in report['meshes'])
 report['dimensions'] = [round(high[i] - low[i], 4) for i in range(3)] if meshes else None
