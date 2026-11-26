@@ -53,7 +53,7 @@ Open an archive with the matching executable, then choose **Archive → Create u
 
 For grooms, select the archive entry or open a `.osgroom` bundle with **Assets → Hair and fur guides**. The bundle preserves the original decoded system and graphics pages. The 3D view displays ribbons along the guide points. OBJ export stores the guides as lines.
 
-Download [OpenSix 1.4.0](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. The version is in the window title and next to the name in the header, where clicking it opens **About**. It is also in the file's **Properties → Details**, and `OpenSix.exe --version --report <new local file>` writes it to a file (the portable executable does not pass console output through). Choose the game folder from the supported Scarlett build. OpenSix reads the executable in that folder to get the archive format tables, and the game stays closed.
+Download [OpenSix 1.4.0](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) for Windows x64, or a native Linux x64 AppImage, deb or tar.xz from [this fork's releases](https://github.com/R1y3n/OpenSix/releases/latest). The version is in the window title and next to the name in the header, where clicking it opens **About**. It is also in the file's **Properties → Details**, and `OpenSix.exe --version --report <new local file>` writes it to a file (the portable executable does not pass console output through). Choose the game folder from the supported Scarlett build. OpenSix reads the executable in that folder to get the archive format tables, and the game stays closed.
 
 ## Archives and filenames
 
@@ -83,7 +83,7 @@ The portable EXE includes VIctory’s BCPack decoder. To use it on more textures
 
 Select a track in a supported audio bank to listen or save it. Opus, PCM, and music stems play in the app. XMA2 can be saved as a track. For XMA2 playback, make [FFmpeg](https://ffmpeg.org/) available on `PATH` or set `OPENSIX_FFMPEG` to its absolute path.
 
-For supported Bink movies, use the `Tools/bink-player.exe` from the [rpf9-explorer v1.3 release](https://github.com/breadbbbb/rpf9-explorer/releases/tag/v1.3). Place it beside OpenSix.exe or set `OPENSIX_BINK_PLAYER` to its absolute path. OpenSix checks that it has the expected helper before starting playback.
+Bink 2 movies play with the built-in decoder on both Windows and the native Linux build. For Bink 1 movies, use the `Tools/bink-player.exe` from the [rpf9-explorer v1.3 release](https://github.com/breadbbbb/rpf9-explorer/releases/tag/v1.3). Place it beside OpenSix.exe or set `OPENSIX_BINK_PLAYER` to its absolute path. OpenSix checks that it has the expected helper before starting playback.
 
 ## Batch workflows
 

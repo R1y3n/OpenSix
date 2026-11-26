@@ -38,8 +38,17 @@ internal static class VictoryBcpack
     private static IntPtr ResolveNativeLibrary(string name, Assembly assembly, DllImportSearchPath? searchPath)
     {
         if (name != NativeImportName) return IntPtr.Zero;
-        string besideExecutable = Path.Combine(AppContext.BaseDirectory, NativeLibraryName);
-        if (File.Exists(besideExecutable)) return NativeLibrary.Load(besideExecutable);
+        foreach (string? directory in new[]
+        {
+            AppContext.BaseDirectory,
+            Path.GetDirectoryName(Environment.ProcessPath),
+            Environment.CurrentDirectory,
+        })
+        {
+            if (string.IsNullOrEmpty(directory)) continue;
+            string candidate = Path.Combine(directory, NativeLibraryName);
+            if (File.Exists(candidate)) return NativeLibrary.Load(candidate);
+        }
         return NativeLibrary.Load(name, assembly, searchPath);
     }
 

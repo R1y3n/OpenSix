@@ -222,7 +222,12 @@ fn apply_appearance(asset: &mut DrawableAsset, path: &Path, appearance: &Appeara
             asset.warnings.push(format!("{}: wardrobe {field} {key:016x} is unavailable",asset.title));
             continue;
         };
-        let uri=image.strip_prefix(output)?.to_string_lossy().replace('\\',"/");
+        let relative=image.strip_prefix(output)?;
+        let uri=if cfg!(windows) {
+            relative.to_string_lossy().replace('\\',"/")
+        } else {
+            relative.to_string_lossy().into_owned()
+        };
         if field=="albedo" { material.base_color_uri=Some(uri.clone()); }
         else { material.normal_uri=Some(uri.clone()); }
         material.extras["wardrobe"][field]=json!({"key":format!("{key:016x}"),"store":store,"png":uri});

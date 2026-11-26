@@ -282,7 +282,9 @@ function createUpdates() {
     // Tests set OPENSIX_TEST_OPEN_LOG to record the address instead of starting a browser.
     openExternal: address => (process.env.OPENSIX_TEST_OPEN_LOG ? appendFileSync(process.env.OPENSIX_TEST_OPEN_LOG, address + '\n') : shell.openExternal(address)),
     notify: result => window?.webContents.send('opensix:update-available', result),
-    automatic: (app.isPackaged || Boolean(override)) && !process.env.OPENSIX_NO_UPDATE_CHECK,
+    // The upstream release feed only publishes the Windows EXE, so do not
+    // offer that download from the native Linux build.
+    automatic: process.platform === 'win32' && (app.isPackaged || Boolean(override)) && !process.env.OPENSIX_NO_UPDATE_CHECK,
   });
 }
 

@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 project(OpenSixFbx LANGUAGES C CXX)
 
-set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
+if(MSVC)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
+endif()
 set(BUILD_SHARED_LIBS OFF)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
 set(ASSIMP_BUILD_TESTS OFF)

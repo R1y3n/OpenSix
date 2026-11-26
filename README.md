@@ -2,7 +2,9 @@
 
 OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Point it at your game folder once and it shows the full folder and archive hierarchy, searches every nested RPF9, and previews or extracts assets without launching the game. OpenSix reads your files in place.
 
-**[Download OpenSix 1.4.0 for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [All releases](https://github.com/cyberpulse2077/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
+**[Download OpenSix 1.4.0 for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · **[Linux x64 build from this fork](https://github.com/R1y3n/OpenSix/releases/latest)** · [All releases](https://github.com/cyberpulse2077/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
+
+The native Linux build (AppImage, deb and tar.xz) is produced by [GitHub Actions](.github/workflows/build-linux.yml); see the [Linux build notes](docs/build.md#linux-build).
 
 ![OpenSix decoding a diner scene from GTA VI’s UI texture pool](docs/images/archive-browser.png)
 

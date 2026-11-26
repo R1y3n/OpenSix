@@ -2,7 +2,7 @@
 
 ## Game build
 
-OpenSix runs on Windows x64. Its RPF9 reader expects one GTA VI Scarlett build and checks the supplied executable before reading its format tables.
+OpenSix runs on Windows x64 and, from this fork's native Linux build, Linux x64. Its RPF9 reader expects one GTA VI Scarlett build and checks the supplied executable before reading its format tables.
 
 | Property | Expected value |
 | --- | --- |
