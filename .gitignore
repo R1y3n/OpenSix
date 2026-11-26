@@ -9,10 +9,12 @@ release/
 /app/assets/ui.bundle.mjs*
 /app/assets/OpenSix.ico
 /app/assets/window.png
+/app/assets/OpenSix.png
 /app/assets/*paths*.txt
 
 *.exe
 *.dll
+*.so
 *.pdb
 *.rpf
 *.rpf9

@@ -1,0 +1,83 @@
+appId: local.opensix.desktop
+productName: OpenSix
+asar: true
+forceCodeSigning: false
+artifactName: ${productName}-${version}-${arch}.${ext}
+directories:
+  output: release
+files:
+  - main.mjs
+  - cli.mjs
+  - preload.cjs
+  - workspace.mjs
+  - available-ranges.mjs
+  - resource-preview.mjs
+  - rpf9.mjs
+  - shader-index.mjs
+  - gpu-bvh.mjs
+  - gta5-convert.mjs
+  - unsigned-rpf9.mjs
+  - zip-output.mjs
+  - names.mjs
+  - library.mjs
+  - library-index.mjs
+  - index-worker.mjs
+  - characters.mjs
+  - wardrobe-catalog.mjs
+  - ped-finish.mjs
+  - updates.mjs
+  - update-service.mjs
+  - native-tools.mjs
+  - explorer.css
+  - index.html
+  - style.css
+  - asset-preview.mjs
+  - bink-playback.mjs
+  - fbx-export.mjs
+  - assets/ui.bundle.mjs
+  - assets/ui.bundle.mjs.LEGAL.txt
+  - icon.svg
+  - assets/OpenSix.png
+  - assets/scarlett-archive-extents.json
+  - assets/scarlett-xbox-bvh.json
+  - assets/scarlett-verified-paths.txt
+  - assets/window.png
+extraResources:
+  - from: worker/opensix-preview
+    to: opensix-preview
+  - from: worker/opensix-fbx
+    to: opensix-fbx
+  - from: worker/opensix-pool
+    to: opensix-pool
+  - from: worker/6ixpack
+    to: 6ixpack
+  - from: worker/libopensix_bcpack.so
+    to: libopensix_bcpack.so
+  - from: worker/VIctory.LICENSE.txt
+    to: licenses/VIctory.txt
+  - from: worker/Bink2.LICENSE.txt
+    to: licenses/Bink2.txt
+  - from: worker/6to5m.LICENSE.txt
+    to: licenses/6to5m.txt
+  - from: worker/DotNet.LICENSE.txt
+    to: licenses/DotNet.LICENSE.txt
+  - from: worker/DotNet.NOTICES.txt
+    to: licenses/DotNet.NOTICES.txt
+  - from: ../third_party/rpf9-explorer/NOTICE.md
+    to: licenses/Rpf9Explorer.md
+  - from: worker/Assimp.LICENSE.txt
+    to: licenses/Assimp.txt
+linux:
+  category: Utility
+  icon: assets/OpenSix.png
+  executableName: OpenSix
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+    - target: tar.xz
+      arch:
+        - x64

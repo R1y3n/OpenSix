@@ -5,6 +5,7 @@ import { delimiter, extname, isAbsolute, join, relative, resolve, sep } from 'no
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { promisify } from 'node:util';
+import { nativeLibrary, nativeLibraryDirectory, resolveNativeTool } from './native-tools.mjs';
 
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -71,10 +72,8 @@ function embedModelImages(folder) {
 
 export async function buildAssetPreview(request, bytes, clip, parts=[]) {
   const isPool=request.kind.startsWith('pool');
-  const name = isPool || ['wardrobe','gpuBvhMesh'].includes(request.kind) ? 'opensix-pool.exe' : 'opensix-preview.exe';
-  const worker = process.resourcesPath && existsSync(join(process.resourcesPath,name))
-    ? join(process.resourcesPath,name)
-    : join(root,'worker',name);
+  const name = isPool || ['wardrobe','gpuBvhMesh'].includes(request.kind) ? 'opensix-pool' : 'opensix-preview';
+  const worker = resolveNativeTool(name);
   const folder = mkdtempSync(join(tmpdir(),'opensix-view-'));
   try {
     if (bytes) writeFileSync(join(folder,'entry.bin'),bytes);
@@ -125,18 +124,27 @@ export async function keepLocalExport(sources, generate) {
 }
 
 function poolEnvironment() {
-  if (process.env.OPENSIX_BCPACK_TABLES) return process.env;
   const portable=process.env.PORTABLE_EXECUTABLE_DIR;
-  const path=[process.resourcesPath && join(process.resourcesPath,'bcpack-tables.bin'),
+  const table=[process.env.OPENSIX_BCPACK_TABLES,
+    process.resourcesPath && join(process.resourcesPath,'bcpack-tables.bin'),
     portable && isAbsolute(portable) && join(portable,'bcpack-tables.bin'),
     join(root,'..','.deps','victory','crates','victory-formats','src','bcpack-tables.bin')]
     .find(candidate=>candidate && existsSync(candidate));
-  return path ? {...process.env,OPENSIX_BCPACK_TABLES:path} : process.env;
+  // On Linux the self-contained pool worker loads the BCPack cdylib by name.
+  // Put the directory that holds it on the loader path for both source and
+  // packaged launches.
+  const libraryPath=nativeLibraryDirectory();
+  const library=join(libraryPath,nativeLibrary('opensix_bcpack.dll'));
+  const loader=process.platform==='linux' && existsSync(library)
+    ? {LD_LIBRARY_PATH:[libraryPath,process.env.LD_LIBRARY_PATH].filter(Boolean).join(':')}
+    : {};
+  return {...process.env,...loader,...(table ? {OPENSIX_BCPACK_TABLES:table} : {})};
 }
 
 async function addXmaPlayback(folder, result) {
+  const ffmpegNames=process.platform==='win32' ? ['ffmpeg.exe'] : ['ffmpeg','ffmpeg.exe'];
   const paths = (process.env.PATH ?? '').split(delimiter)
-    .filter(path=>isAbsolute(path)).map(path=>join(path,'ffmpeg.exe'));
+    .filter(path=>isAbsolute(path)).flatMap(path=>ffmpegNames.map(name=>join(path,name)));
   const ffmpeg = [process.env.OPENSIX_FFMPEG,...paths].find(path=>path && isAbsolute(path) && existsSync(path));
   if (!ffmpeg) { result.note='Install FFmpeg or set OPENSIX_FFMPEG to play XMA2.'; return; }
   const args = ['-nostdin','-hide_banner','-loglevel','error','-protocol_whitelist','file,pipe','-f','wav',

@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process';
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { keepLocalExport } from './asset-preview.mjs';
+import { resolveNativeTool } from './native-tools.mjs';
 
 const execute=promisify(execFile);
 export const gta5Formats=new Map([['convertYmap','ymap'],['convertYdr','ydr'],['convertYbn','ybn'],
@@ -32,8 +32,7 @@ export function convertGta5(kind, inputPath, map) {
   const ext=extname(inputPath).toLowerCase();
   const want={ymap:'.json',ytyp:'.json',ydr:'.obj',ybn:'.obj',ytd:'.dds'}[format];
   if (!map && ext!==want) throw new Error('Choose a decoded '+want+' file.');
-  const local=process.resourcesPath && join(process.resourcesPath,'6ixpack.exe');
-  const worker=local && existsSync(local) ? local : fileURLToPath(new URL('./worker/6ixpack.exe',import.meta.url));
+  const worker=resolveNativeTool('6ixpack');
   return keepLocalExport([inputPath],async folder=>{
     let input=inputPath;
     if (format==='ymap') {

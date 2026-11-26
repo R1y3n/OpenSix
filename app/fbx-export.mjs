@@ -1,18 +1,17 @@
 import { execFile } from 'node:child_process';
-import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdtemp, open, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { resolveNativeTool } from './native-tools.mjs';
 
 const run = promisify(execFile);
 const signature = Buffer.from('Kaydara FBX Binary  \0\x1a\0', 'binary');
 
 export async function withFbxExport(source, save) {
-  const binary = process.resourcesPath && join(process.resourcesPath, 'opensix-fbx.exe');
-  const helper = binary && existsSync(binary) ? binary : fileURLToPath(new URL('./worker/opensix-fbx.exe', import.meta.url));
+  const helper = resolveNativeTool('opensix-fbx');
   const folder = await mkdtemp(join(tmpdir(), 'opensix-fbx-'));
   const input = join(folder, 'model.glb');
   const output = join(folder, 'model.fbx');

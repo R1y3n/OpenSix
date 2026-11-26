@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using RpfPreview.Core;
@@ -5,10 +6,15 @@ using RpfPreview.Core;
 internal static class VictoryBcpack
 {
     private const int TableLength = 77982;
+    private const string NativeImportName = "opensix_bcpack";
     private const string TableSha256 = "1F1D4760419202BB5672F0C428CE51E456B5D08FBAEC8F371D043FD94E01C36B";
+    private static readonly string NativeLibraryName = OperatingSystem.IsWindows()
+        ? "opensix_bcpack.dll"
+        : OperatingSystem.IsMacOS() ? "libopensix_bcpack.dylib" : "libopensix_bcpack.so";
 
     public static void Configure()
     {
+        NativeLibrary.SetDllImportResolver(typeof(VictoryBcpack).Assembly, ResolveNativeLibrary);
         string? path = Environment.GetEnvironmentVariable("OPENSIX_BCPACK_TABLES");
         if (string.IsNullOrEmpty(path)) return;
         if (!Path.IsPathFullyQualified(path) || new FileInfo(path).Length != TableLength)
@@ -29,7 +35,15 @@ internal static class VictoryBcpack
         return output;
     }
 
-    [DllImport("opensix_bcpack.dll", EntryPoint = "opensix_bcpack_decode", CallingConvention = CallingConvention.Cdecl)]
+    private static IntPtr ResolveNativeLibrary(string name, Assembly assembly, DllImportSearchPath? searchPath)
+    {
+        if (name != NativeImportName) return IntPtr.Zero;
+        string besideExecutable = Path.Combine(AppContext.BaseDirectory, NativeLibraryName);
+        if (File.Exists(besideExecutable)) return NativeLibrary.Load(besideExecutable);
+        return NativeLibrary.Load(name, assembly, searchPath);
+    }
+
+    [DllImport(NativeImportName, EntryPoint = "opensix_bcpack_decode", CallingConvention = CallingConvention.Cdecl)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.AssemblyDirectory | DllImportSearchPath.ApplicationDirectory)]
     private static extern int DecodeNative(byte codec, [In] byte[] source, nuint sourceLength, [Out] byte[] output,
         nuint outputLength, [In] byte[] tables, nuint tablesLength);

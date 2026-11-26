@@ -29,4 +29,8 @@ for (let index = 0; index < icons.length; index++) {
 }
 writeFileSync('assets/OpenSix.ico', Buffer.concat([directory, ...icons]));
 writeFileSync('assets/window.png', icons.at(-1));
-console.log('Windows icon sizes', sizeList.join(', '));
+const linuxIcon = Buffer.from(new Resvg(square, {
+  fitTo: { mode: 'width', value: 512 },
+}).render().asPng());
+writeFileSync('assets/OpenSix.png', linuxIcon);
+console.log('Windows icon sizes', sizeList.join(', '), '+ Linux icon 512x512');

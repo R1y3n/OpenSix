@@ -1,0 +1,100 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_prerelease:
+        description: Publish a prerelease with the built packages
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+      - 'linux-*'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Check out the fork
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 patchelf \
+            libgtk-3-dev libnss3-dev libasound2-dev libxss1 libgbm-dev \
+            libdrm-dev libxkbcommon-dev libatk-bridge2.0-dev \
+            libatspi2.0-dev libpango1.0-dev libcups2-dev libfuse2
+
+      - name: Set up Rust 1.100.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.100.0'
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache Cargo registry and build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            .deps/cargo-target-linux
+          key: linux-cargo-${{ runner.os }}-${{ hashFiles('native/preview/Cargo.lock', 'native/bcpack/Cargo.lock') }}
+          restore-keys: linux-cargo-${{ runner.os }}-
+
+      - name: Build all native components and Linux packages
+        run: ./scripts/build-linux.sh
+
+      - name: List packages
+        run: ls -lh app/release/
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenSix-linux-x64
+          path: |
+            app/release/*.AppImage
+            app/release/*.deb
+            app/release/*.tar.xz
+          if-no-files-found: error
+
+      - name: Publish prerelease
+        if: ${{ inputs.publish_prerelease || startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('linux-{0}', github.sha) }}
+        run: |
+          gh release create "$TAG" app/release/*.AppImage app/release/*.deb app/release/*.tar.xz \
+            --title "OpenSix Linux $TAG" \
+            --notes "Native Linux x64 build. AppImage, deb and tar.xz include the native preview, pool, FBX, BCPack and 6ixpack helpers." \
+            --prerelease

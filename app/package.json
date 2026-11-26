@@ -59,6 +59,7 @@
       "asset-preview.mjs",
       "bink-playback.mjs",
       "fbx-export.mjs",
+      "native-tools.mjs",
       "assets/ui.bundle.mjs",
       "assets/ui.bundle.mjs.LEGAL.txt",
       "icon.svg",
