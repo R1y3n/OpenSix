@@ -190,14 +190,24 @@ export function loadIndex(directory) {
 }
 
 // ----- label persistence (resumable) -----
+// Returns the archives whose models were scanned. The archives whose clip dictionaries were scanned are in `done.clips`.
 export function loadLabels(directory, index) {
   const progressPath = join(directory, 'labels-progress.json');
+  const clipsPath = join(directory, 'clips-progress.json');
   const labelsPath = join(directory, 'labels.jsonl');
   const done = new Set();
-  if (!existsSync(progressPath) || !existsSync(labelsPath)) return done;
-  const progress = JSON.parse(readFileSync(progressPath, 'utf8'));
-  if (progress.fingerprint !== index.header.fingerprintHash) return done;
-  for (const id of progress.done) done.add(id);
+  done.clips = new Set();
+  if (!existsSync(labelsPath)) return done;
+  const read = path => {
+    if (!existsSync(path)) return [];
+    try {
+      const progress = JSON.parse(readFileSync(path, 'utf8'));
+      return progress.fingerprint === index.header.fingerprintHash ? progress.done : [];
+    } catch { return []; }
+  };
+  for (const id of read(progressPath)) done.add(id);
+  for (const id of read(clipsPath)) done.clips.add(id);
+  if (!done.size && !done.clips.size) return done;
   for (const line of readFileSync(labelsPath, 'utf8').split('\n')) {
     if (!line) continue;
     try {
@@ -344,11 +354,14 @@ export async function buildIndex({ gameDir, exe, directory, onProgress = () => {
 }
 
 // Scan model system pages for embedded drawable labels. Resumable and incremental.
-export async function scanLabels({ index, exe, gameDir, directory, onProgress = () => {}, threads = defaultThreads(2), isCancelled = () => false, done = null }) {
-  done ??= loadLabels(directory, index);
+export async function scanLabels({ index, exe, gameDir, directory, onProgress = () => {}, threads = defaultThreads(2), isCancelled = () => false, done = null, mode = 'models' }) {
+  const clips = mode === 'clips';
+  const loaded = done ?? loadLabels(directory, index);
+  done = clips ? loaded.clips : loaded;
   const wanted = [];
   const modelTypes = new Set();
-  for (let type = 0; type < 256; type++) if (modelExtensions.has(index.extensionOf(type))) modelTypes.add(type);
+  const kinds = clips ? new Set(['zcd']) : modelExtensions;
+  for (let type = 0; type < 256; type++) if (kinds.has(index.extensionOf(type))) modelTypes.add(type);
   index.archives.forEach((archive, archiveIndex) => {
     if (done.has(archiveIndex) || !archive.rowCount) return;
     const rows = [];
@@ -362,12 +375,12 @@ export async function scanLabels({ index, exe, gameDir, directory, onProgress = 
   const total = wanted.reduce((sum, item) => sum + item.rows.length, 0);
   let scanned = 0, found = 0, failed = 0;
   const labelsPath = join(directory, 'labels.jsonl');
-  const progressPath = join(directory, 'labels-progress.json');
+  const progressPath = join(directory, clips ? 'clips-progress.json' : 'labels-progress.json');
   let lastSave = 0;
   const save = () => writeFileSync(progressPath, JSON.stringify({ fingerprint: index.header.fingerprintHash, done: [...done] }));
   const pool = new Pool(threads, { exe, gameDir });
   try {
-    onProgress({ phase: 'labels', done: 0, total });
+    onProgress({ phase: clips ? 'clips' : 'labels', done: 0, total });
     // One task per archive, in file order. The pool runs only a few at once so a spinning game drive is not thrashed.
     wanted.sort((a, b) => (a.archive.rel < b.archive.rel ? -1 : a.archive.rel > b.archive.rel ? 1 : a.archive.start - b.archive.start));
     const slices = wanted;
@@ -375,7 +388,7 @@ export async function scanLabels({ index, exe, gameDir, directory, onProgress = 
     await Promise.all(slices.map(async slice => {
       if (isCancelled()) return;
       try {
-        const result = await pool.run({ type: 'labels', rel: slice.archive.rel, start: slice.archive.start, size: slice.archive.size, rows: slice.rows });
+        const result = await pool.run({ type: 'labels', mode, rel: slice.archive.rel, start: slice.archive.start, size: slice.archive.size, rows: slice.rows });
         const lines = [];
         for (const [rowId, match, labels] of result.found) {
           const rowIndex = slice.archive.rowStart + rowId;
@@ -393,7 +406,7 @@ export async function scanLabels({ index, exe, gameDir, directory, onProgress = 
         failed += slice.rows.length;
         scanned += slice.rows.length;
       }
-      onProgress({ phase: 'labels', done: scanned, total, found, failed });
+      onProgress({ phase: clips ? 'clips' : 'labels', done: scanned, total, found, failed });
       if (Date.now() - lastSave > 5000) { lastSave = Date.now(); save(); }
     }));
     save();

@@ -27,7 +27,9 @@ Use the chips under the heading to limit results to models, textures, animations
 
 A character is a set of drawables whose embedded labels share a prefix, such as `cs_lucia`. Searching for a name shows the matching characters above the results. Choose **Preview and export**, or open **Assets → Characters**. The dialog lists the character's parts by slot, preselects a complete cutscene body and head when the character has one, assembles the parts on one skeleton with their textures, and shows the result in 3D. **Save GLB** and **Save FBX** write the same model. The preview and both exports carry the skeleton, skin weights, three UV layers and the base-color texture OpenSix could resolve.
 
-Modular clothing sets such as `player_story000_00` assemble their geometry and skeleton. Their garment textures come from the wardrobe system, which the character dialog does not read yet, so those parts can appear without colour. See [compatibility](compatibility.md).
+Modular clothing sets such as `player_story000_00` and `player_story000_01` take their garment and face textures from the game's wardrobe catalogue, a large metadata file in `packs.rpf` that OpenSix finds by itself. When the catalogue lists several texture sets for a garment, the part gets a **Colour** choice. The default look prefers parts that the catalogue covers so that every part has colour. Hair strands are not attached. The game data stores no link from a hairstyle to its strand resource, so hairstyle parts appear as the game's own empty placeholder. See [compatibility](compatibility.md).
+
+Searching also finds clip dictionaries. Each dictionary carries its own name, the names of its clips and the animation files it uses. A dictionary's name is shown as its file name when its hash matches the entry, and its clip names are searchable.
 
 ## Top menus
 

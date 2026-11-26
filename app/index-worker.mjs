@@ -42,6 +42,22 @@ function walk(task) {
   return { rowCount: count, hi, lo, h32, type, sys, size, flags, nested, signature: archive.headerSignature };
 }
 
+// Clip dictionaries store their own name, the names of their clips and the animation files they use as plain text.
+// Only lowercase tokens are taken, which leaves out the binary noise between them.
+const clipToken = /[a-z0-9_@:\/.\-]{6,240}/g;
+function clipNames(text) {
+  const names = new Set();
+  for (const [token] of text.matchAll(clipToken)) {
+    if (token.startsWith('pack:/')) {
+      const file = token.slice(6);
+      if (/^[a-z0-9_@.\-]+\.(clip|anim)$/.test(file)) names.add(file);
+    } else if (token.includes('@') && /^[a-z]/.test(token) && !token.includes(':') && !token.includes('/') && /@[a-z0-9_\-]{2,}/.test(token)) {
+      names.add(token);
+    }
+  }
+  return [...names].slice(0, 400);
+}
+
 async function labels(task) {
   const archive = open(task);
   const byId = new Map(archive.rows.map(row => [row.id, row]));
@@ -54,7 +70,7 @@ async function labels(task) {
     try {
       const page = await readSystemPage(game, archive, row);
       const text = page.toString('latin1');
-      const names = [...new Set([...text.matchAll(labelPattern)].map(match => match[1]))];
+      const names = task.mode === 'clips' ? clipNames(text) : [...new Set([...text.matchAll(labelPattern)].map(match => match[1]))];
       if (!names.length) continue;
       const match = names.findIndex(name => murmurName64(game.normalize(name)) === row.hash64);
       found.push([id, match, names]);

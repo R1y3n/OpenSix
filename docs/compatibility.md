@@ -36,10 +36,11 @@ Check a local copy with `Get-FileHash -Algorithm SHA256 -LiteralPath '<path to e
 
 - Archive entry names are 64-bit hashes. OpenSix shows a path only when a hash matches a verified path or a model's own label. Most entries remain hash-only, and searches cannot match a name that the game data does not store.
 - Texture pools have no names, so a texture is found by its key hash (the value a model material lists), its pool, format or size.
-- Modular ped clothing (for example `player_story000_00`) assembles geometry and skeleton, but its garment textures come from the wardrobe catalog and are not applied by the character dialog. Hair and fur strands are separate groom resources and are not attached to assembled characters.
+- Modular ped clothing (for example `player_story000_00`) is textured from the wardrobe catalogue. Its hairstyle parts are three-vertex placeholders, and hair strands are separate groom resources (40,019 `zsm` entries). OpenSix does not attach them. No hairstyle, wardrobe preset, drawable or metadata resource names a groom, and the grooms' coordinates are relative to hair bones that the assembled skeleton does not contain, so any pairing would be a guess.
+- The shared ped skeleton is not found by the preview worker, so modular clothing is bound to each drawable's own bones. It poses correctly as a static model but is not ready for the game's animation rig.
 
 - Source archives open read-only. The writer creates new unsigned archives with regular file records. Signed retail repacking and resource replacement remain open.
-- Paths are verified against the archive hashes. Two names in the local `common.rpf` audit, slots 243 and 316, remain unresolved. Their heightmap payloads can still be previewed and extracted.
+- Paths are verified against the archive hashes. Two names in the local `common.rpf` audit, slots 243 and 316, remain unresolved after about 49 million candidate paths built from model labels, clip names, verified paths and terrain vocabulary. Their heightmap payloads can still be previewed and extracted.
 - Texture and material coverage varies by asset. Some variants have no renderable preview, and some TTPF layouts expose a reduced mip chain.
 - Model assembly uses the parts and texture sources you open. Wheel placement and wardrobe albedo and normal overrides are supported where the data can be resolved. Wardrobe palettes and some authored materials still need more coverage.
 - XMA2 playback, Bink 1 and synchronized Bink audio use the local helpers listed in the [usage guide](usage.md).

@@ -1,7 +1,7 @@
 import { closeSync, createReadStream, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, isAbsolute, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { GameExecutable, openArchive, decodePayload, readStored, openVerifiedArchiveFile, streamPayload } from './rpf9.mjs';
+import { GameExecutable, openArchive, decodePayload, readStored, readSystemPage, openVerifiedArchiveFile, streamPayload } from './rpf9.mjs';
 import { FilenameIndex, fallbackName } from './names.mjs';
 import { hasByteRange, readAvailableRanges } from './available-ranges.mjs';
 import { previewResource } from './resource-preview.mjs';
@@ -608,7 +608,9 @@ async function previewEntry(url) {
         return openMovie(info.archive.path,info.archive.start+row.offset,row.size);
       }
       const kindHint = resourceKind(extension,header);
-      if ((row.size > 8 * 1024 * 1024 && !kindHint) || row.kind === 'archive') {
+      // Metadata resources can be large (the wardrobe catalogue is 11 MB), so they are read up to 64 MB.
+      const largeMetadata = extension === 'zmt' && row.size <= 64 * 1024 * 1024;
+      if ((row.size > 8 * 1024 * 1024 && !kindHint && !largeMetadata) || row.kind === 'archive') {
         return deliver({ ...previewBytes(readStored(info.archive, row, 512)), stored: true });
       }
       const bytes = decodePayload(state.game, info.archive, row);
@@ -798,3 +800,31 @@ export async function assembleParts(parts, clip) {
 }
 
 export const workspaceNames = () => workspace?.names ?? null;
+
+// Decoded bytes of one entry, for readers that run in the main process.
+export function readEntryBytes(key, rowId, limit = 64 * 1024 * 1024) {
+  const { state, info } = infoFor(key);
+  const row = rowFor(info, String(rowId));
+  if (row.pool || row.shader || row.bvh || row.size > limit) fail('This entry cannot be read as bytes.');
+  return decodePayload(state.game, info.archive, row);
+}
+
+// The first bytes of an entry, without decoding the rest of it.
+export async function readEntryPrefix(key, rowId, length = 1024) {
+  const { state, info } = infoFor(key);
+  const row = rowFor(info, String(rowId));
+  if (row.pool || row.shader || row.bvh || row.kind === 'archive') fail('This entry cannot be read as bytes.');
+  const stream = streamPayload(state.game, info.archive, row);
+  const parts = [];
+  let have = 0;
+  try {
+    for await (const part of stream) {
+      parts.push(part);
+      have += part.length;
+      if (have >= length) break;
+    }
+  } finally {
+    stream.destroy();
+  }
+  return Buffer.concat(parts).subarray(0, length);
+}

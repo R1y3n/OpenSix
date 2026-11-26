@@ -409,7 +409,7 @@ async function selectEntry(entry, fromSearch = false) {
   el('entry-path').textContent = entry.fullPath ?? '';
   setProps([
     ['Name source', pool ? 'Texture key' : entry.nameSource ?? 'Archive hash only'],
-    ['Embedded model labels', entry.modelLabels?.join(', ') || null],
+    ['Embedded names', entry.modelLabels?.join(', ') || null],
     ['64-bit hash', entry.hash64 ? '0x' + entry.hash64 : null, true],
     ['32-bit hash', entry.hash32 ? '0x' + entry.hash32 : null, true],
     ['Offset', hex(entry.offset), true],
@@ -792,7 +792,7 @@ function enterSearch(query, data) {
   el('archive-name').textContent = 'Search: ' + query;
   const labelState = state.status?.labels;
   el('archive-meta').textContent = data.total.toLocaleString() + ' matches' + (data.truncated ? ' · first ' + data.results.length.toLocaleString() + ' shown' : '') +
-    (labelState?.state === 'running' ? ' · model names are still being indexed, so more matches may appear' : '');
+    (labelState?.state === 'running' ? ' · names are still being indexed, so more matches may appear' : '');
   el('search-chips').hidden = false;
   el('clear-search').hidden = false;
   el('search').closest('label').hidden = true;
@@ -1013,11 +1013,11 @@ function drawStatus(status) {
   } else if (index.state === 'failed') {
     text = 'Indexing failed: ' + index.error;
   } else if (labels.state === 'running') {
-    text = 'Indexing model names… ' + Math.round((labels.done ?? 0) / Math.max(labels.total ?? 1, 1) * 100) + '% · ' + (labels.found ?? 0).toLocaleString() + ' named';
+    text = 'Indexing ' + (labels.phase === 'clips' ? 'animation' : 'model') + ' names… ' + Math.round((labels.done ?? 0) / Math.max(labels.total ?? 1, 1) * 100) + '% · ' + (labels.found ?? 0).toLocaleString() + ' named';
     value = labels.done ?? 0; max = Math.max(labels.total ?? 1, 1);
   } else if (index.state === 'ready') {
     text = (status.counts?.rows ?? 0).toLocaleString() + ' entries in ' + (status.counts?.archives ?? 0).toLocaleString() + ' archives indexed · ' +
-      (status.counts?.named ?? 0) + ' paths verified · ' + (status.counts?.labelled ?? 0).toLocaleString() + ' model labels' +
+      (status.counts?.named ?? 0) + ' paths verified · ' + (status.counts?.labelled ?? 0).toLocaleString() + ' embedded names' +
       (status.textures ? ' · ' + status.textures.toLocaleString() + ' textures' : '');
     host.hidden = false;
     el('index-text').textContent = text;

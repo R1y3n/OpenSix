@@ -87,6 +87,14 @@ export function setupCharacters({ lib, notify, navigate }) {
         box.checked = part.default;
         box.dataset.rowIndex = String(part.rowIndex);
         row.append(box, node('span', part.name, 'mono'), node('small', part.copies > 1 ? part.copies + ' detail levels' : ''));
+        if (part.variants > 1) {
+          // The wardrobe catalogue lists several texture sets (colours) for this garment.
+          const choice = node('select');
+          choice.setAttribute('aria-label', 'Texture set for ' + part.label);
+          choice.dataset.rowIndex = String(part.rowIndex);
+          for (let i = 0; i < part.variants; i++) choice.append(new Option('Colour ' + (i + 1) + ' of ' + part.variants, String(i)));
+          row.append(choice);
+        } else if (part.variants === 1) row.append(node('small', 'textured'));
         row.title = part.location + '/' + part.name;
         section.append(row);
       }
@@ -120,7 +128,9 @@ export function setupCharacters({ lib, notify, navigate }) {
     say('Assembling ' + rows.length + ' parts and resolving their textures…');
     const mine = ++ticket;
     try {
-      const output = await lib('assemble-character', { prefix: current.prefix, rows });
+      const variants = {};
+      for (const choice of partsHost.querySelectorAll('select[data-row-index]')) variants[choice.dataset.rowIndex] = Number(choice.value);
+      const output = await lib('assemble-character', { prefix: current.prefix, rows, variants });
       if (mine !== ticket) return;
       say();
       let result = output.result;

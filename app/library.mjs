@@ -8,6 +8,8 @@ import * as workspace from './workspace.mjs';
 import { buildIndex, buildTextureIndex, classify, defaultThreads, fingerprint, hashHex, loadIndex, loadLabels, loadTextureIndex,
   poolFingerprint, scanLabels, searchCategories } from './library-index.mjs';
 import { buildAssetPreview } from './asset-preview.mjs';
+import { decodeWardrobeCatalog, drawableVariants, taggedVariants } from './wardrobe-catalog.mjs';
+import { joaatName32 } from './rpf9.mjs';
 import { legacyLook, listCharacters, outfitOptions, outfitPrefix } from './characters.mjs';
 
 export const EXECUTABLE_NAME = 'game_scarlett_master.exe';
@@ -182,6 +184,7 @@ export class Library {
     index.extensionOf = type => game.extension(type);
     this.index = index;
     // Labels found by an earlier scan are searchable immediately.
+    this.wardrobeCache = undefined;
     this.labelsDone = loadLabels(this.indexDirectory, index);
     this.#openTextures();
     this.topByRel.clear();
@@ -256,15 +259,20 @@ export class Library {
     const index = this.index, gameDir = this.gameDir;
     this.labelState = { state: 'running', done: 0, total: 0, found: 0 };
     let lastBump = 0;
-    scanLabels({
-      index, exe: this.exe, gameDir, directory: this.indexDirectory, threads: defaultThreads(2), done: this.labelsDone,
+    const run = mode => scanLabels({
+      index, exe: this.exe, gameDir, directory: this.indexDirectory, threads: defaultThreads(2), done: this.labelsDone, mode,
       isCancelled: () => this.cancel || this.gameDir !== gameDir,
       onProgress: progress => {
         if (this.gameDir !== gameDir) return;
         this.labelState = { state: 'running', ...progress };
         if (Date.now() - lastBump > 1500) { lastBump = Date.now(); this.#bump(); }
       },
-    }).then(result => {
+    });
+    // Models first, then the names stored in clip dictionaries.
+    run('models').then(models => run('clips').then(clips => ({
+      scanned: models.scanned + clips.scanned, found: models.found + clips.found, failed: models.failed + clips.failed,
+      complete: models.complete && clips.complete,
+    }))).then(result => {
       if (this.gameDir !== gameDir) return;
       this.#bump();
       this.labelState = { state: result.complete ? 'done' : 'idle', ...result };
@@ -507,13 +515,14 @@ export class Library {
         if (outfitPrefix(name)) parts.push({ name, rowIndex, size: index.size[rowIndex] });
       }
     }
-    const byPrefix = new Map(), counts = new Map();
+    const byPrefix = new Map(), counts = new Map(), copies = new Map();
     for (const part of parts) {
       const prefix = outfitPrefix(part.name);
       (byPrefix.get(prefix) ?? byPrefix.set(prefix, []).get(prefix)).push(part);
       counts.set(part.name, (counts.get(part.name) ?? 0) + 1);
+      (copies.get(part.name) ?? copies.set(part.name, []).get(part.name)).push(part.rowIndex);
     }
-    this.characterCache = { byPrefix, counts, list: listCharacters(byPrefix) };
+    this.characterCache = { byPrefix, counts, copies, list: listCharacters(byPrefix) };
     return this.characterCache;
   }
 
@@ -660,42 +669,115 @@ export class Library {
       .map(character => ({ ...character, location: this.#characterLocation(character.prefix) }));
   }
 
-  characterParts(prefix) {
-    const { byPrefix, counts } = this.#characters();
+  // The wardrobe catalogue says which albedo and normal textures each clothing drawable wears. It is found once and cached.
+  #wardrobe() { return (this.wardrobeCache ??= this.#loadWardrobe()); }
+
+  async #loadWardrobe() {
+    if (!this.index) return null;
+    const cachePath = join(this.indexDirectory, 'wardrobe-location.json');
+    let location = null;
+    try { location = JSON.parse(readFileSync(cachePath, 'utf8')); } catch { location = null; }
+    const index = this.index;
+    const read = async (ref, row, whole) => {
+      const { key } = await this.#mountRef(ref);
+      return whole ? workspace.readEntryBytes(key, row) : workspace.readEntryPrefix(key, row, 1024);
+    };
+    if (location?.fingerprint !== index.header.fingerprintHash) location = null;
+    if (!location) {
+      // Look through the metadata resources of the top-level archives for the catalogue's root block type.
+      outer: for (const [archiveNumber, archive] of index.archives.entries()) {
+        if (archive.parent >= 0) continue;
+        for (let id = 0; id < archive.rowCount; id++) {
+          const row = archive.rowStart + id;
+          if (index.extension(row) !== 'zmt' || index.size[row] < 100000 || index.size[row] > 64 * 1024 * 1024) continue;
+          let head;
+          try { head = await read(this.archiveRef(archiveNumber), id, false); } catch { continue; }
+          if (head.toString('ascii', 0, 4) !== 'PSIN') continue;
+          let found = false;
+          for (let at = 8; at + 16 <= head.length && !found; at += 16) {
+            if (head.subarray(at, at + 8).every(byte => byte === 0x70)) break;
+            found = head.readUInt32LE(at) === 0x8dcb4cf5;
+          }
+          if (found) { location = { ref: this.archiveRef(archiveNumber), row: id, fingerprint: index.header.fingerprintHash }; break outer; }
+        }
+      }
+      if (!location) return null;
+      try { writeFileSync(cachePath, JSON.stringify(location)); } catch { /* The next launch looks again. */ }
+    }
+    try {
+      const catalog = decodeWardrobeCatalog(await read(location.ref, location.row, true));
+      return { byHash: drawableVariants(catalog), byName: taggedVariants(catalog) };
+    } catch {
+      return null;
+    }
+  }
+
+  // Texture variants for a drawable: states that name its archive hash (any detail-level copy) or list its joaat name hash.
+  #variantsOf(wardrobe, name, rows) {
+    if (!wardrobe) return [];
+    const seen = new Set(), list = [];
+    const add = variant => {
+      const key = variant.albedo + variant.normal + variant.extra;
+      if (!seen.has(key)) { seen.add(key); list.push(variant); }
+    };
+    for (const rowIndex of rows) for (const variant of wardrobe.byHash.get(this.index.hash64(rowIndex)) ?? []) add(variant);
+    for (const variant of wardrobe.byName.get(parseInt(joaatName32(Buffer.from(name)), 16)) ?? []) add(variant);
+    return list.slice(0, 64);
+  }
+
+  async characterParts(prefix) {
+    const { byPrefix, counts, copies: copyRows } = this.#characters();
     const options = outfitOptions(byPrefix.get(prefix) ?? [], prefix);
     if (!options.length) fail('No drawable labels use the prefix ' + prefix + '.');
     const look = legacyLook(options);
-    const defaultRows = new Set(look ?? options.filter(option => option.default).map(option => option.rowIndex));
+    const wardrobe = await this.#wardrobe();
     const index = this.index;
+    const withVariants = options.map(option => ({ option, variants: this.#variantsOf(wardrobe, option.name, copyRows.get(option.name) ?? [option.rowIndex]) }));
+    // A part with no catalogue entry would render without colour, so prefer one that has an entry within its slot.
+    const defaults = new Set(look ?? options.filter(option => option.default).map(option => option.rowIndex));
+    if (!look) {
+      for (const item of withVariants) {
+        if (!defaults.has(item.option.rowIndex) || item.variants.length) continue;
+        const better = withVariants.find(other => other.option.group === item.option.group && other.variants.length &&
+          !other.option.label.includes('_alt_'));
+        if (better) { defaults.delete(item.option.rowIndex); defaults.add(better.option.rowIndex); }
+      }
+    }
     return {
-      prefix, legacy: Boolean(look),
-      parts: options.map(option => {
+      prefix, legacy: Boolean(look), wardrobe: Boolean(wardrobe),
+      parts: withVariants.map(({ option, variants }) => {
         const archive = index.archiveOf(option.rowIndex);
-        const copies = counts.get(option.name) ?? 1;
         return {
           rowIndex: option.rowIndex, archive, row: option.rowIndex - index.archives[archive].rowStart, name: option.name,
-          group: option.group, label: option.label, size: option.size, default: defaultRows.has(option.rowIndex), copies,
+          group: option.group, label: option.label, size: option.size, default: defaults.has(option.rowIndex),
+          copies: counts.get(option.name) ?? 1, variants: variants.length,
           location: index.archiveTrail(archive).map(item => item.name).join('/'), ref: this.archiveRef(archive),
         };
       }),
     };
   }
 
-  async assembleCharacter({ prefix, rows }) {
-    const { parts } = this.characterParts(prefix);
+  async assembleCharacter({ prefix, rows, variants = {} }) {
+    const { parts } = await this.characterParts(prefix);
     const wanted = rows?.length ? parts.filter(part => rows.includes(part.rowIndex)) : parts.filter(part => part.default);
     if (!wanted.length) fail('Choose at least one part.');
+    const wardrobe = await this.#wardrobe();
+    const { copies: copyRows } = this.#characters();
     const assembly = [];
+    const textured = [];
     for (const part of wanted) {
       const mounted = await this.#mountRef(this.archiveRef(part.archive));
-      assembly.push({ archive: mounted.key, entry: part.row, index: null, detail: null });
-    }
-    if (assembly.length === 1) {
-      const { key } = await this.#mountRef(this.archiveRef(wanted[0].archive));
-      return { single: { archive: key, entry: wanted[0].row } };
+      const entry = { archive: mounted.key, entry: part.row, index: null, detail: null };
+      const found = this.#variantsOf(wardrobe, part.name, copyRows.get(part.name) ?? [part.rowIndex]);
+      const choice = found[Math.min(Math.max(Number(variants[part.rowIndex]) || 0, 0), Math.max(found.length - 1, 0))];
+      if (choice) {
+        entry.appearance = { albedo: choice.albedo, normal: choice.normal, extra: choice.extra, palette: choice.palette.toString(16).padStart(8, '0') };
+        textured.push(part.name);
+      }
+      assembly.push(entry);
     }
     const result = await workspace.assembleParts(assembly, null);
-    return { result, parts: wanted.map(part => part.name) };
+    return { result, parts: wanted.map(part => part.name), textured };
   }
 }
 

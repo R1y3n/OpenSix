@@ -129,3 +129,5 @@ h1 { font-size: 21px; margin: 0 0 2px; }
 .dependency { display: grid; grid-template-columns: 140px 1fr auto; gap: 8px; align-items: center; padding: 3px 0; font-size: 12px; border-bottom: 1px solid #2c1f36; }
 .dependency code { font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
 .link-button { padding: 2px 8px; font-size: 11px; }
+
+.part-row select { width: auto; max-width: 150px; padding: 2px 6px; font-size: 11px; }
