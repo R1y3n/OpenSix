@@ -1,10 +1,5 @@
 appId: local.opensix.desktop
 productName: OpenSix
-description: Native Linux archive browser for GTA VI RPF9 archives
-homepage: https://github.com/R1y3n/OpenSix
-author:
-  name: OpenSix
-  email: opensix@users.noreply.github.com
 asar: true
 forceCodeSigning: false
 artifactName: ${productName}-${version}-${arch}.${ext}

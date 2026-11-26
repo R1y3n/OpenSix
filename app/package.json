@@ -2,7 +2,11 @@
   "name": "opensix",
   "version": "1.4.0",
   "description": "Read-only GTA VI RPF9 archive browser",
-  "author": "OpenSix",
+  "author": {
+    "name": "OpenSix",
+    "email": "opensix@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/R1y3n/OpenSix",
   "private": true,
   "main": "main.mjs",
   "type": "module",
