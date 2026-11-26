@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="app-bar">
-    <div class="brand"><img class="brand-icon" src="/icon.svg" alt="" width="47" height="36"><span>OpenSix</span></div>
+    <div class="brand"><img class="brand-icon" src="/icon.svg" alt="" width="47" height="36"><span>OpenSix</span><button id="about-open" class="brand-version" type="button" title="About OpenSix" aria-haspopup="dialog" hidden></button></div>
     <nav class="app-menu" aria-label="OpenSix tools">
       <details>
         <summary>Archive</summary>
@@ -27,6 +27,7 @@
           <button type="button" data-action="shaders" data-archive-only>Export shader index…</button>
           <button type="button" data-action="create" data-archive-only>Create unsigned RPF9…</button>
           <button type="button" data-action="reindex">Rebuild search index</button>
+          <button type="button" data-action="updates">Check for updates…</button>
         </div>
       </details>
       <details>
@@ -164,6 +165,32 @@
     </div>
     <p id="setup-error" class="notice" role="alert" hidden></p>
     <div class="dialog-actions"><button class="primary" id="setup-use" type="button">Use this folder</button></div>
+  </dialog>
+  <div id="update-toast" class="update-toast" role="status" hidden>
+    <p id="update-toast-text"></p>
+    <div class="update-toast-actions"><button id="update-toast-details" class="primary" type="button">Details</button><button id="update-toast-later" type="button">Later</button></div>
+  </div>
+  <dialog id="update-dialog" aria-labelledby="update-title">
+    <div class="dialog-title"><h2 id="update-title"></h2><button id="close-update" type="button" aria-label="Close">×</button></div>
+    <p id="update-summary" class="quiet"></p>
+    <h3 class="update-heading">What's new</h3>
+    <pre id="update-notes" class="update-notes" tabindex="0"></pre>
+    <dl id="update-file" class="about-details"></dl>
+    <p class="quiet">OpenSix opens the release page in your browser. Compare the SHA-256 above with the downloaded file if you want to check it.</p>
+    <p id="update-error" class="notice" role="alert" hidden></p>
+    <div class="dialog-actions"><button id="update-skip" type="button">Skip this version</button><button id="update-later" type="button">Later</button><button id="update-download" class="primary" type="button">Open the download page</button></div>
+  </dialog>
+  <dialog id="about-dialog" aria-labelledby="about-title">
+    <div class="dialog-title"><h2 id="about-title">About OpenSix</h2><button id="close-about" type="button" aria-label="Close">×</button></div>
+    <p class="about-version">OpenSix <strong id="about-version"></strong></p>
+    <dl id="about-details" class="about-details"></dl>
+    <div class="about-updates">
+      <label class="check-row"><input id="about-auto" type="checkbox"> Check for updates automatically</label>
+      <p class="quiet">OpenSix asks GitHub's public list of releases each time it starts. The request carries only the name and version of OpenSix, with nothing about you, your PC or the game. GitHub sees your IP address, as with any web request. OpenSix never downloads or installs anything by itself.</p>
+      <div class="about-update-row"><button id="about-check" type="button">Check now</button><span id="about-update-status" class="quiet" role="status"></span></div>
+    </div>
+    <p class="quiet">OpenSix reads GTA VI game files in place and never changes them. Releases and source: <code>github.com/cyberpulse2077/OpenSix</code></p>
+    <div class="dialog-actions"><button id="about-copy" type="button">Copy version</button><button id="about-done" class="primary" type="button">Close</button></div>
   </dialog>
   <dialog id="character-dialog" aria-labelledby="character-title">
     <div class="dialog-title"><h2 id="character-title">Characters</h2><button id="close-character" type="button" aria-label="Close characters">×</button></div>

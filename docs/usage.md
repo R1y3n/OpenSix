@@ -53,7 +53,7 @@ Open an archive with the matching executable, then choose **Archive → Create u
 
 For grooms, select the archive entry or open a `.osgroom` bundle with **Assets → Hair and fur guides**. The bundle preserves the original decoded system and graphics pages. The 3D view displays ribbons along the guide points. OBJ export stores the guides as lines.
 
-Download [OpenSix.exe](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. Choose the game folder from the supported Scarlett build. OpenSix reads the executable in that folder to get the archive format tables, and the game stays closed.
+Download [OpenSix 1.4.0](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. The version is in the window title and next to the name in the header, where clicking it opens **About**. It is also in the file's **Properties → Details**, and `OpenSix.exe --version --report <new local file>` writes it to a file (the portable executable does not pass console output through). Choose the game folder from the supported Scarlett build. OpenSix reads the executable in that folder to get the archive format tables, and the game stays closed.
 
 ## Archives and filenames
 
@@ -95,3 +95,11 @@ Use `--report` with a new local file to get JSON Lines from the portable executa
 ```
 
 Add `--stored` to export the stored representation of an archive entry. Pass `--id` more than once to extract a batch.
+
+## Updates
+
+OpenSix checks for a newer release by itself. Each time it starts, a few seconds after the window opens, it asks GitHub's public list of releases (`api.github.com/repos/cyberpulse2077/OpenSix/releases/latest`) for the latest stable release and compares its version with the one you run. The request carries only the name `OpenSix` and its version number, with nothing about you, your PC or the game. GitHub sees your IP address, as with any web request. This is the only network request OpenSix makes. A failed check, for example when you are offline, is quiet.
+
+When a newer release exists, a note appears at the bottom right. **Details** shows the release notes and the file's SHA-256. **Open the download page** opens the release page in your browser. **Skip this version** hides the note until a later release. OpenSix never downloads or installs a release itself.
+
+Click the version in the header to open **About**, or choose **Archive → Check for updates**, to check now or to switch the automatic check off. The choice is saved in OpenSix's settings in `%APPDATA%OpenSix`.

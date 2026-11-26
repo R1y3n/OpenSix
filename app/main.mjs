@@ -1,6 +1,6 @@
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, protocol, session, shell } from 'electron';
-import { constants as fsConstants, copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, constants as fsConstants, copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
@@ -12,6 +12,8 @@ import { withFbxExport } from './fbx-export.mjs';
 import { runCli } from './cli.mjs';
 import { stopMovie } from './bink-playback.mjs';
 import { Library } from './library.mjs';
+import { createUpdateService } from './update-service.mjs';
+import { RELEASES_API } from './updates.mjs';
 
 const APP_URL = 'opensix://app/';
 const bundle = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +37,7 @@ nativeTheme.themeSource = 'dark';
 app.setPath('userData', process.env.OPENSIX_DATA_DIR || join(app.getPath('appData'), 'OpenSix'));
 let library = null;
 let libraryReady = Promise.resolve();
+let updates = null;
 app.setAppUserModelId('local.opensix.desktop');
 app.commandLine.appendSwitch('disable-background-networking');
 
@@ -230,7 +233,7 @@ async function choosePath(kind) {
 
 export async function createWindow(show = true) {
   window = new BrowserWindow({
-    title: 'OpenSix',
+    title: 'OpenSix ' + app.getVersion(),
     width: 1360,
     height: 870,
     minWidth: 790,
@@ -247,6 +250,8 @@ export async function createWindow(show = true) {
     },
   });
   window.removeMenu();
+  // The page title is just "OpenSix"; keep the version in the window title.
+  window.on('page-title-updated', event => event.preventDefault());
   window.once('closed',()=>stopMovie());
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => {
@@ -255,6 +260,30 @@ export async function createWindow(show = true) {
   if (show) window.once('ready-to-show', () => window.show());
   await window.loadURL(APP_URL);
   return window;
+}
+
+// The update check is the only thing in OpenSix that uses the network. It runs here, not in the page, in its own
+// in-memory session that can reach GitHub's release API and nothing else. The page stays blocked from the network.
+function createUpdates() {
+  // Tests can point the check at a local server on this PC. Nothing else overrides the address.
+  const override = /^http:\/\/127\.0\.0\.1:\d{2,5}\//.test(process.env.OPENSIX_UPDATE_URL ?? '') ? process.env.OPENSIX_UPDATE_URL : undefined;
+  const updateSession = session.fromPartition('opensix-updates');
+  updateSession.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) =>
+    callback({ cancel: !(details.url.startsWith(RELEASES_API) || (override && details.url.startsWith(override))) }));
+  updateSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  // A fixed language, so the request does not carry the PC's language settings.
+  updateSession.setUserAgent('OpenSix/' + app.getVersion(), 'en-US');
+  return createUpdateService({
+    current: app.getVersion(),
+    fetchImpl: (address, init) => updateSession.fetch(address, init),
+    url: override,
+    preferences: () => library.preferences(),
+    savePreferences: patch => library.savePreferences(patch),
+    // Tests set OPENSIX_TEST_OPEN_LOG to record the address instead of starting a browser.
+    openExternal: address => (process.env.OPENSIX_TEST_OPEN_LOG ? appendFileSync(process.env.OPENSIX_TEST_OPEN_LOG, address + '\n') : shell.openExternal(address)),
+    notify: result => window?.webContents.send('opensix:update-available', result),
+    automatic: (app.isPackaged || Boolean(override)) && !process.env.OPENSIX_NO_UPDATE_CHECK,
+  });
 }
 
 async function libraryRoute(route, payload = {}) {
@@ -275,16 +304,25 @@ async function libraryRoute(route, payload = {}) {
 
 export const ready = app.whenReady().then(() => {
   library = new Library(app.getPath('userData'));
-  const cli = process.argv.includes('--cli');
+  const cli = process.argv.includes('--cli') || process.argv.includes('--version');
   const gameFlag = process.argv.findIndex(argument => argument === '--game-dir');
   const gameDir = gameFlag >= 0 ? process.argv[gameFlag + 1] : undefined;
   libraryReady = cli ? Promise.resolve() : library.init({ gameDir }).catch(() => {});
+  updates = createUpdates();
+  if (!cli && !process.argv.includes('--desktop-fixture')) updates.schedule();
   session.defaultSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
     (_details, callback) => callback({ cancel: true }),
   );
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   protocol.handle('opensix', response);
+  handle('opensix:about', () => ({
+    version: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node,
+  }));
+  handle('opensix:update-state', () => updates.state());
+  handle('opensix:update-check', () => updates.check({ manual: true }));
+  handle('opensix:update-set', options => updates.set(options));
+  handle('opensix:update-open', () => updates.open());
   handle('opensix:request', dispatch);
   handle('opensix:save', save);
   handle('opensix:save-preview',savePreview);
@@ -315,6 +353,8 @@ export const ready = app.whenReady().then(() => {
 const cliFlag=process.argv.indexOf('--cli');
 if (cliFlag>=0) {
   ready.then(()=>runCli(process.argv.slice(cliFlag+1))).then(code=>app.exit(code));
+} else if (process.argv.includes('--version')) {
+  ready.then(()=>runCli(process.argv.slice(process.argv.indexOf('--version')))).then(code=>app.exit(code));
 } else if (process.argv.includes('--desktop-fixture') && !app.isPackaged) {
   // The development-only harness creates the window after the same setup.
 } else {

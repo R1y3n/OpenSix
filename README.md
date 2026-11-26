@@ -2,7 +2,7 @@
 
 OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Point it at your game folder once and it shows the full folder and archive hierarchy, searches every nested RPF9, and previews or extracts assets without launching the game. OpenSix reads your files in place.
 
-**[Download OpenSix.exe for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
+**[Download OpenSix 1.4.0 for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [All releases](https://github.com/cyberpulse2077/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
 
 ![OpenSix decoding a diner scene from GTA VI’s UI texture pool](docs/images/archive-browser.png)
 
@@ -26,6 +26,7 @@ OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Poi
 - **Inspect more resource types.** Read vehicle handling, particle rules and keyframes, groom guides, and cloth constraints. Save hair guides and cloth constraints as OBJ lines. Open a decoded audio bank or Bink movie from the **Assets** menu.
 - **Search localization tables.** Search a decoded table by label hash or text and save CSV or JSON. Read typed PSIN fields and export recognized script documents as XML.
 - **Inspect shader groups and Xbox GPU BVH data.** Browse decoded SGD5 members and effect links in a complete supported `shaders.rpf`. Preview the geometry for the verified Xbox GPU BVH sample and export it with its compressed BVH, geometry buffers, transforms and address descriptors.
+- **Tell you about new releases.** OpenSix checks GitHub's public release list each time it starts and shows a note when a newer version exists. The request carries only the name and version of OpenSix, nothing about you or your game. It never installs anything by itself, and the check can be switched off in **About**.
 - **Create unsigned RPF9 archives.** Pack a folder of files, then reopen it with the original relative paths in OpenSix.
 - **Convert assets for GTA V mods.** Save YMAP placements, YDR drawables, YBN collision files, YTD textures, and YTYP archetypes from supported inputs.
 - **Play Bink 2 video and export audio.** Step and seek with the built-in decoder, and save supported DCT tracks as WAV.

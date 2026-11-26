@@ -955,6 +955,103 @@ el('name-file').addEventListener('change', async () => {
   }
 });
 
+// ---------------------------------------------------------------- version
+
+// The version is in the window title (set by the main process), next to the name in the header, and in an About dialog.
+window.opensix.about().then(info => {
+  document.title = 'OpenSix ' + info.version;
+  const badge = el('about-open');
+  badge.textContent = 'v' + info.version;
+  badge.hidden = false;
+  el('about-version').textContent = info.version;
+  const rows = [['Electron', info.electron], ['Chromium', info.chrome], ['Node.js', info.node]];
+  el('about-details').replaceChildren(...rows.flatMap(([name, value]) => [node('dt', name), node('dd', value)]));
+  badge.addEventListener('click', openAbout);
+  el('close-about').addEventListener('click', () => el('about-dialog').close());
+  el('about-done').addEventListener('click', () => el('about-dialog').close());
+  el('about-copy').addEventListener('click', () => window.opensix.copy('OpenSix ' + info.version).then(() => message('Copied OpenSix ' + info.version + '.')));
+}).catch(() => {});
+
+function openAbout() {
+  const dialog = el('about-dialog');
+  if (!dialog.open) dialog.showModal();
+}
+
+// ---------------------------------------------------------------- updates
+
+// OpenSix asks GitHub's public release list whether a newer release exists, in the main process, each time it starts.
+// It only offers the release page; nothing is downloaded or installed by the app itself.
+const updates = window.opensix.updates;
+let offered = null;       // the newer release shown in the toast and the update dialog
+
+function formatBytes(bytes) {
+  return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MiB' : Math.max(1, Math.round(bytes / 1024)) + ' KiB';
+}
+
+function showUpdateDetails(result) {
+  offered = result;
+  el('update-title').textContent = 'OpenSix ' + result.latest + ' is available';
+  el('update-summary').textContent = 'You have ' + result.current + '.' + (result.published ? ' Published ' + new Date(result.published).toLocaleDateString() + '.' : '');
+  el('update-notes').textContent = result.notes || 'This release has no notes.';
+  const rows = result.asset ? [['File', result.asset.name + (result.asset.size ? ' (' + formatBytes(result.asset.size) + ')' : '')],
+    ...(result.asset.sha256 ? [['SHA-256', result.asset.sha256]] : [])] : [];
+  el('update-file').replaceChildren(...rows.flatMap(([name, value]) => [node('dt', name), node('dd', value)]));
+  message('', false, el('update-error'));
+  el('update-toast').hidden = true;
+  if (!el('update-dialog').open) el('update-dialog').showModal();
+}
+
+function offerUpdate(result) {
+  offered = result;
+  el('update-toast-text').textContent = 'OpenSix ' + result.latest + ' is available. You have ' + result.current + '.';
+  el('update-toast').hidden = false;
+}
+
+function updateStatus(text, error = false) {
+  const target = el('about-update-status');
+  target.textContent = text;
+  target.dataset.error = String(error);
+}
+
+async function checkNow() {
+  const check = el('about-check');
+  check.disabled = true;
+  updateStatus('Checking…');
+  try {
+    const result = await updates.check();
+    if (result.status === 'available') {
+      updateStatus('OpenSix ' + result.latest + ' is available.');
+      el('about-dialog').close();
+      showUpdateDetails(result);
+    } else updateStatus('OpenSix ' + result.current + ' is up to date. Checked ' + new Date().toLocaleTimeString() + '.');
+  } catch (error) { updateStatus(clean(error.message), true); }
+  finally { check.disabled = false; }
+}
+
+el('about-check').addEventListener('click', checkNow);
+el('about-auto').addEventListener('change', event => {
+  updates.set({ enabled: event.target.checked }).catch(error => { event.target.checked = !event.target.checked; updateStatus(clean(error.message), true); });
+});
+el('update-toast-details').addEventListener('click', () => offered && showUpdateDetails(offered));
+el('update-toast-later').addEventListener('click', () => { el('update-toast').hidden = true; });
+el('update-later').addEventListener('click', () => el('update-dialog').close());
+el('close-update').addEventListener('click', () => el('update-dialog').close());
+el('update-download').addEventListener('click', () => {
+  updates.open().then(() => el('update-dialog').close(), error => message(clean(error.message), true, el('update-error')));
+});
+el('update-skip').addEventListener('click', () => {
+  if (!offered) return;
+  updates.set({ skip: offered.latest }).then(() => { el('update-dialog').close(); el('update-toast').hidden = true; },
+    error => message(clean(error.message), true, el('update-error')));
+});
+updates.onAvailable(offerUpdate);
+updates.state().then(({ enabled, skipped, result, lastCheck }) => {
+  el('about-auto').checked = enabled;
+  if (lastCheck) updateStatus('Last checked ' + new Date(lastCheck).toLocaleString() + '.');
+  // The check can finish before this page is ready, so offer what it already found.
+  if (result?.status === 'available' && skipped !== result.latest) offerUpdate(result);
+}).catch(() => {});
+
 // ---------------------------------------------------------------- setup and status
 
 const characterDialog = setupCharacters({ lib, notify: message, navigate: id => go(id) });
@@ -1076,6 +1173,7 @@ setupTools({
     if (name === 'gamefolder') { showSetup({ closable: true }); return true; }
     if (name === 'search') { el('global-search').focus(); el('global-search').select(); return true; }
     if (name === 'characters') { characterDialog.open(); return true; }
+    if (name === 'updates') { openAbout(); checkNow(); return true; }
     if (name === 'reindex') {
       lib('rebuild').then(status => { state.status = status; drawStatus(status); }).catch(error => message(clean(error.message), true));
       return true;

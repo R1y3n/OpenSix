@@ -8,6 +8,14 @@ function unwrap(reply) {
 }
 
 contextBridge.exposeInMainWorld('opensix', {
+  about: () => ipcRenderer.invoke('opensix:about').then(unwrap),
+  updates: {
+    state: () => ipcRenderer.invoke('opensix:update-state').then(unwrap),
+    check: () => ipcRenderer.invoke('opensix:update-check').then(unwrap),
+    set: options => ipcRenderer.invoke('opensix:update-set', options).then(unwrap),
+    open: () => ipcRenderer.invoke('opensix:update-open').then(unwrap),
+    onAvailable: callback => { ipcRenderer.on('opensix:update-available', (_event, result) => callback(result)); },
+  },
   request: (path, payload) => ipcRenderer.invoke('opensix:request', path, payload).then(unwrap),
   save: (archive, entry, stored, mip) => ipcRenderer.invoke('opensix:save', archive, entry, stored, mip).then(unwrap),
   choose: kind => ipcRenderer.invoke('opensix:choose',kind).then(unwrap),

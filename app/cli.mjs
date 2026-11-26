@@ -1,4 +1,4 @@
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, readFileSync } from 'node:fs';
 import { link, mkdir, open, readFile, rm, stat } from 'node:fs/promises';
 import { basename, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,7 +11,10 @@ import { dispatch, prepareExport, scanEntries } from './workspace.mjs';
 
 const usage = 'opensix search|export <archive-or-folder> --exe <game.exe> [--query <text>] [--recursive] [--names <paths.txt>] [--labels]\n' +
   'opensix export <archive-or-folder> --out <directory> [--id <entry-id>] [--stored]\n' +
-  'For an individual .ttpf file, omit --exe. Use --report <new local file> to save JSON Lines.';
+  'opensix --version\n' +
+  'For an individual .ttpf file, omit --exe. Use --report <new local file> to save JSON Lines (or the version) from the portable executable.';
+
+const appVersion = () => JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
 
 async function allArchives(roots, settings) {
   const result = [...roots];
@@ -68,13 +71,14 @@ export async function runCli(args) {
     const {values,positionals}=parseArgs({args,allowPositionals:true,options:{
       exe:{type:'string'},query:{type:'string'},recursive:{type:'boolean'},names:{type:'string'},
       out:{type:'string'},id:{type:'string',multiple:true},stored:{type:'boolean'},help:{type:'boolean'},
-      report:{type:'string'},labels:{type:'boolean'},
+      report:{type:'string'},labels:{type:'boolean'},version:{type:'boolean'},
     }});
     const [operation,source]=positionals;
     if (values.report) {
       if (!isAbsolute(values.report) || /^(?:\\\\|\/\/)/.test(values.report)) throw new Error('Choose an absolute local report path.');
       report=await open(values.report,'wx');
     }
+    if (values.version) { await line('OpenSix '+appVersion()); return 0; }
     if (values.help) { await line(usage); return 0; }
     if (!['search','export'].includes(operation)||!source||positionals.length!==2||
         (operation==='export'&&!values.out)) throw new Error(usage);

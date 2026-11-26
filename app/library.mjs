@@ -53,6 +53,14 @@ export class Library {
     try { return JSON.parse(readFileSync(this.settingsPath, 'utf8')); } catch { return {}; }
   }
 
+  // Preferences that are not about the game folder, such as update checking.
+  preferences() { return this.settings.preferences ?? {}; }
+
+  savePreferences(patch) {
+    this.settings.preferences = { ...this.settings.preferences, ...patch };
+    this.#writeSettings();
+  }
+
   #writeSettings() {
     const temporary = this.settingsPath + '.tmp';
     writeFileSync(temporary, JSON.stringify(this.settings, null, 2));

@@ -1,6 +1,6 @@
 {
   "name": "opensix",
-  "version": "1.3.3",
+  "version": "1.4.0",
   "description": "Read-only GTA VI RPF9 archive browser",
   "author": "OpenSix",
   "private": true,
@@ -51,6 +51,8 @@
       "characters.mjs",
       "wardrobe-catalog.mjs",
       "ped-finish.mjs",
+      "updates.mjs",
+      "update-service.mjs",
       "explorer.css",
       "index.html",
       "style.css",
