@@ -41,14 +41,14 @@ apply_patch() {
 
 init_dep sixng     https://github.com/holdmysocks/SixNG.git          08f1c2ed211aa80cfc7b0edfc472b89a723a3567
 init_dep assimp    https://github.com/assimp/assimp.git              a79ff6bbce54d3e01186a918dc6374ed55317426
-init_dep explorer  https://github.com/breadbbbb/rpf9-explorer.git    af549336624fdabf7d1bb6f00b8783e7e1ef692e
+init_dep rpf9-explorer https://github.com/breadbbbb/rpf9-explorer.git af549336624fdabf7d1bb6f00b8783e7e1ef692e
 init_dep victory   https://github.com/Marvisak/VIctory.git           d2a4bae1f49533ef5cb512fd1b1ba1513f2e1989
 init_dep bink2     https://github.com/codingkoala/bink2-decoder.git  2e709c23023d0af75eead5e93cdeb4e5c19f4128
 init_dep 6to5m     https://github.com/DesignWithTommy/6to5m.git      5d62e745bb4413d7f21923b23c713b6651728868
 
 apply_patch "$deps/sixng"    "$root/third_party/sixng/preview-api.patch"
 apply_patch "$deps/assimp"   "$root/third_party/assimp/fbx-uv-layers.patch"
-apply_patch "$deps/explorer" "$root/third_party/rpf9-explorer/ttpf-preview.patch"
+apply_patch "$deps/rpf9-explorer" "$root/third_party/rpf9-explorer/ttpf-preview.patch"
 apply_patch "$deps/victory"  "$root/third_party/victory/external-tables.patch"
 
 export CARGO_TARGET_DIR="$cargo_target"
