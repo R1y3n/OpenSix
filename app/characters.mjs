@@ -1,0 +1,88 @@
+// Group embedded drawable labels into assemblable characters.
+// The grouping rules follow the naming scheme found in the game's own drawable labels:
+// `<character prefix>_<item>_<fit>_...` where a fit tag looks like `mr1` or `fr1`.
+// Nothing here invents names: every prefix and part comes from a label stored inside a drawable.
+
+export const isFit = token => token.length === 3 && (token[0] === 'm' || token[0] === 'f') &&
+  /[a-z]/.test(token[1]) && /[0-9]/.test(token[2]);
+
+export function isAnimal(name) {
+  return name.length > 4 && name.startsWith('cr') && /[a-z]/.test(name[2]) && name[3] === '_';
+}
+
+export function outfitPrefix(name) {
+  const tokens = name.split('_');
+  if (['char', 'fchar', 's01'].includes(tokens[0]) || isAnimal(name)) return null;
+  const at = tokens.findIndex(isFit);
+  if (at < 3) return null;
+  return tokens.slice(0, at - 1).join('_');
+}
+
+const slots = [
+  ['hair', 'hair'], ['beard', 'beard'], ['brows', 'brows'], ['lashes', 'lashes'], ['eyes', 'eyes'], ['teeth', 'teeth'],
+  ['bodyupper', 'body upper'], ['bodylower', 'body lower'], ['fullbody', 'full'], ['dress', 'full'], ['jumpsuit', 'full'],
+  ['overalls', 'full'], ['jacket', 'outer'], ['coat', 'outer'], ['blazer', 'outer'], ['cardigan', 'outer'],
+  ['tshirt', 'top'], ['shirt', 'top'], ['sweatshirt', 'top'], ['hoodie', 'top'], ['tanktop', 'top'], ['blouse', 'top'],
+  ['bra', 'top'], ['pants', 'bottom'], ['shorts', 'bottom'], ['skirt', 'bottom'], ['undies', 'bottom'],
+  ['leggings', 'bottom'], ['boots', 'feet'], ['shoes', 'feet'], ['sneakers', 'feet'], ['sandals', 'feet'],
+  ['heels', 'feet'], ['piercing', 'piercing'],
+];
+const accessories = [
+  ['hat', 'hat'], ['cap', 'hat'], ['helmet', 'hat'], ['beanie', 'hat'], ['sunglasses', 'glasses'], ['glasses', 'glasses'],
+  ['backpack', 'bag'], ['bag', 'bag'], ['watch', 'watch'], ['necklace', 'neck'], ['chain', 'neck'], ['earring', 'ears'],
+  ['glove', 'gloves'], ['mask', 'mask'],
+];
+
+const longest = (table, item) => table.filter(([word]) => item.startsWith(word))
+  .reduce((best, entry) => (!best || entry[0].length > best[0].length ? entry : best), null)?.[1] ?? null;
+
+function slotOf(item) { return item === 'head' ? 'head' : longest(slots, item); }
+
+// Parts of one character prefix, grouped by outfit slot. The default look is one part per slot.
+export function outfitOptions(parts, prefix) {
+  const start = prefix + '_';
+  const byName = new Map();
+  for (const part of parts) {
+    const name = part.name;
+    if (!name.startsWith(start) || outfitPrefix(name) !== prefix) continue;
+    const previous = byName.get(name);
+    // One entry per name: the largest copy is the highest detail level.
+    if (!previous || part.size > previous.size || (part.size === previous.size && part.rowIndex < previous.rowIndex)) byName.set(name, part);
+  }
+  const options = [];
+  const chosen = new Map();
+  for (const [name, part] of [...byName].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
+    if (['_cull', '_fp', 'eyecap', 'tattooprojection'].some(word => name.includes(word))) continue;
+    const rest = name.slice(start.length);
+    const item = rest.split('_')[0];
+    const optional = name.includes('_alt_') || name.includes('holster');
+    const slot = slotOf(item);
+    let group;
+    if (slot === 'head' && name.includes('_eyes')) group = 'head eyes';
+    else if (slot === 'head' && name.includes('_earring')) group = 'head earring';
+    else if (slot) group = slot;
+    else group = longest(accessories, item) ?? item;
+    if (!optional && slot && !chosen.has(group)) chosen.set(group, part.rowIndex);
+    options.push({ ...part, group, label: rest, default: false });
+  }
+  if (chosen.has('full')) { chosen.delete('top'); chosen.delete('bottom'); }
+  for (const option of options) option.default = chosen.get(option.group) === option.rowIndex;
+  return options;
+}
+
+// A complete cutscene body and head pair ("legacy" ped parts) is the most self-contained look.
+export function legacyLook(options) {
+  const body = options.find(option => /^legacypedcs_/.test(option.label) && option.label.includes('_fullbody'));
+  const head = options.find(option => /^legacyheadcs_/.test(option.label));
+  return body && head ? [body.rowIndex, head.rowIndex] : null;
+}
+
+export function listCharacters(byPrefix) {
+  const characters = [];
+  for (const prefix of [...byPrefix.keys()].sort()) {
+    const options = outfitOptions(byPrefix.get(prefix), prefix);
+    if (!options.length) continue;
+    characters.push({ prefix, parts: options.length, defaultParts: options.filter(option => option.default).length });
+  }
+  return characters;
+}

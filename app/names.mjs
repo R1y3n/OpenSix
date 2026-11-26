@@ -49,6 +49,12 @@ export class FilenameIndex {
     }
   }
 
+  *hashKeys() {
+    yield* this.#hashes.keys();
+  }
+
+  get size() { return this.#candidates.size; }
+
   resolve(row) {
     const suffix = this.#game.extension(row.type);
     const candidates = this.#hashes.get(row.hash64) ?? [];

@@ -23,6 +23,15 @@ const expectedExtents = Object.entries(JSON.parse(readFileSync(new URL('./assets
 
 let workspace = null;
 let sequence = 0;
+// The library supplies names and embedded labels it verified against archive hashes.
+let libraryHooks = { name: () => null, labels: () => [] };
+export const setLibraryHooks = hooks => { libraryHooks = hooks; };
+
+function resolveRow(row, state) {
+  const found = state.names.resolve(row);
+  if (found) return found;
+  return row.libraryRow === undefined ? null : libraryHooks.name(row.libraryRow);
+}
 
 function fail(message, code = 400) {
   const error = new Error(message);
@@ -60,7 +69,7 @@ function mount(state, path, parent = null, row = null) {
   const archive = openArchive(state.game,path,
     parent ? parent.archive.start+row.offset : 0, row?.size, { availableRanges });
   for (const name of authoredPaths(archive)) state.names.add(name,'OpenSix archive manifest');
-  if (parent) archive.name = basename(state.names.resolve(row)?.path ?? fallbackName(row, state.game));
+  if (parent) archive.name = basename(resolveRow(row, state)?.path ?? fallbackName(row, state.game));
   const info = { key, archive, parent: parent?.key ?? null, row: row?.id ?? null };
   state.archives.set(key, info);
   return info;
@@ -111,7 +120,7 @@ function rowFor(info, input) {
 function describeArchive(info, state) {
   const { archive } = info;
   let resolved = 0;
-  if (!archive.pool) for (const row of archive.rows) if (row.bvh || row.shader || state.names.resolve(row)) resolved++;
+  if (!archive.pool) for (const row of archive.rows) if (row.bvh || row.shader || resolveRow(row, state)) resolved++;
   return {
     id: info.key, name: archive.name, path: archive.path, parent: info.parent,
     size: archive.size, entries: archive.rowCount, resolved, pool: Boolean(archive.pool),
@@ -136,10 +145,12 @@ function describeRow(row, state) {
     return {id:row.id,name,type,size,stored,offset,hash64:hash,hash32:null,keywords,
       resolved:true,nameSource:'Native SGD5 records',kind:'shaderRecord',encrypted:false,chunks:null,nestedAvailable:false};
   }
-  const name = state.names.resolve(row);
+  const name = resolveRow(row, state);
   return {
-    id: row.id, name: name?.path ?? fallbackName(row, state.game), modelLabels:row.modelLabels ?? [],
-    resolved: Boolean(name), nameSource: name?.source ?? null,
+    id: row.id, name: name?.path ?? fallbackName(row, state.game),
+    modelLabels:row.modelLabels ?? (row.libraryRow===undefined ? [] : libraryHooks.labels(row.libraryRow)),
+    resolved: Boolean(name), nameSource: name?.source ?? null, nameFromLabel: Boolean(name?.label),
+    libraryRow: row.libraryRow ?? null,
     type: row.kind === 'archive' ? 'RPF9' : (name ? extname(name.path).slice(1) : '') || state.game.extension(row.type) || 'file',
     kind: row.kind, size: row.size, stored: row.stored, offset: row.offset,
     hash64: row.hash64, hash32: row.hash32, encrypted: Boolean(row.crypto),
@@ -420,6 +431,7 @@ export function dispatch(endpoint, input) {
     if (!state.names) fail('Open an RPF9 archive before importing paths.');
     if (typeof input.text !== 'string') fail('Provide a plain-text list of candidate paths.');
     state.names.addText(input.text, 'Imported path list', true);
+    libraryHooks.namesChanged?.();
     return deliver(view(state));
   }
   if (!post && route === '/api/list') {
@@ -692,3 +704,97 @@ export function prepareExport(archive, entry, stored, mip) {
       : direct ? Buffer.alloc(0) : streamPayload(state.game, info.archive, row),
   };
 }
+
+// ----- explorer support -----
+export function initWorkspace(executable) {
+  const path = getPath(executable, '.exe');
+  if (workspace?.executable === path) return workspace;
+  const pools = [...(workspace?.archives ?? [])].filter(([, item]) => item.archive.pool);
+  const game = new GameExecutable(path);
+  workspace = { executable: path, game, archives: new Map(pools), names: new FilenameIndex(game) };
+  return workspace;
+}
+
+export const workspaceGame = () => workspace?.game ?? null;
+
+function findMounted(state, path, parentKey, rowId) {
+  return [...state.archives.values()].find(item => !item.archive.pool && item.archive.path === path &&
+    item.parent === parentKey && item.row === rowId);
+}
+
+// Open a top-level archive of the game folder without reading its contents.
+export async function mountTopLevel(path) {
+  const state = requireWorkspace();
+  const absolute = getPath(path);
+  const existing = findMounted(state, absolute, null, null);
+  if (existing) return existing.key;
+  let bvh;
+  if (isXboxBvhArchive(absolute)) {
+    try { bvh = await openXboxBvh(state.game, state.executable, absolute); } catch { /* The plain archive still opens. */ }
+  }
+  const info = addArchive(state, absolute, bvh);
+  await addShaderRecords(state, info);
+  return info.key;
+}
+
+export function mountNestedRow(parentKey, rowId) {
+  const { state, info } = infoFor(parentKey);
+  const row = rowFor(info, String(rowId));
+  if (row.kind !== 'archive' || row.crypto || row.chunks || row.size > row.stored) fail('This entry cannot be opened as an archive.');
+  const existing = findMounted(state, info.archive.path, info.key, row.id);
+  if (existing) return existing.key;
+  return mount(state, info.archive.path, info, row).key;
+}
+
+// Give an opened archive's rows their position in the library index.
+export function tagLibraryRows(key, rowStart) {
+  const { info } = infoFor(key);
+  info.libraryRowStart = rowStart;
+  for (const row of info.archive.rows) if (!row.bvh && !row.shader) row.libraryRow = rowStart + row.id;
+}
+
+export function describeEntry(key, rowId) {
+  const { state, info } = infoFor(key);
+  return describeRow(rowFor(info, String(rowId)), state);
+}
+
+export function archiveSummary(key) {
+  const { state, info } = infoFor(key);
+  return describeArchive(info, state);
+}
+
+// The children of one folder inside an archive. Resolved paths form folders; unresolved entries stay at the root.
+export function browseArchive(key, folder = '') {
+  const { state, info } = infoFor(key);
+  const prefix = folder ? folder + '/' : '';
+  const folders = new Map();
+  const items = [];
+  const names = new Set();
+  for (const row of info.archive.rows) {
+    const entry = describeRow(row, state);
+    if (entry.resolved && entry.name.includes('/')) {
+      const parts = entry.name.split('/');
+      for (let i = 1; i < parts.length; i++) names.add(parts.slice(0, i).join('/'));
+      if (!entry.name.startsWith(prefix)) continue;
+      const rest = entry.name.slice(prefix.length);
+      const slash = rest.indexOf('/');
+      if (slash >= 0) {
+        const name = rest.slice(0, slash);
+        folders.set(name, (folders.get(name) ?? 0) + 1);
+        continue;
+      }
+      items.push(entry);
+    } else if (!folder) items.push(entry);
+  }
+  return {
+    archive: describeArchive(info, state),
+    folders: [...folders].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, path: prefix + name, count })),
+    entries: items,
+  };
+}
+
+export async function assembleParts(parts, clip) {
+  return assemble({ parts, clip });
+}
+
+export const workspaceNames = () => workspace?.names ?? null;

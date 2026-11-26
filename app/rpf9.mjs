@@ -617,3 +617,24 @@ export function readStored(archive, row, limit = row.stored) {
     closeSync(fd);
   }
 }
+
+// Decode only the system page of a resource (its first `systemSize` bytes). Model names and other
+// embedded labels live there, so indexing can skip the much larger graphics page.
+export async function readSystemPage(executable, archive, row, wanted = row.systemSize) {
+  requireFormat(row.kind === 'resource' && row.chunks?.items?.length && wanted > 0,
+    'This entry has no resource chunk table.');
+  const stream = streamPayload(executable, archive, row);
+  const parts = [];
+  let have = 0;
+  try {
+    for await (const part of stream) {
+      parts.push(part);
+      have += part.length;
+      if (have >= wanted) break;
+    }
+  } finally {
+    stream.destroy();
+  }
+  requireFormat(have >= wanted, 'The system page ended early.');
+  return Buffer.concat(parts).subarray(0, wanted);
+}

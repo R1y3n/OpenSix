@@ -81,7 +81,7 @@ function mapView(host, map) {
   return ()=>observer.disconnect();
 }
 
-export function setupTools({ current, openPool, openFound, notify }) {
+export function setupTools({ current, openPool, notify, action: handleAction = () => false }) {
   const el=id=>document.getElementById(id);
   const menu=document.querySelector('.app-menu');
   const dialog=el('tool-dialog'), output=el('tool-output');
@@ -98,14 +98,12 @@ export function setupTools({ current, openPool, openFound, notify }) {
     dispose=null;
     output.replaceChildren();
   }
-  function showDialog(title, search=false) {
+  function showDialog(title) {
     revision++;
     clearOutput();
     showStatus();
     el('tool-title').textContent=title;
-    el('tool-source').hidden=search;
-    el('tool-search-form').hidden=!search;
-    el('tool-search-form').reset();
+    el('tool-source').hidden=false;
     el('tool-roads').checked=false;
     el('tool-road-filter').hidden=kind!=='toolNavmesh';
     browse.disabled=false;
@@ -225,7 +223,8 @@ export function setupTools({ current, openPool, openFound, notify }) {
     kind=button.dataset.tool;
     const name=button.dataset.action;
     try {
-      if (kind || name==='search') showDialog(button.textContent.replace(/…$/,''),name==='search');
+      if (kind) showDialog(button.textContent.replace(/…$/,''));
+      else if (handleAction(name)) return;
       else if (name==='open') el('open').click();
       else if (name==='names') el('import-names').click();
       else if (name==='pool') await openPool();
@@ -252,27 +251,6 @@ export function setupTools({ current, openPool, openFound, notify }) {
   browse.addEventListener('click',async()=>{
     try { const path=await window.opensix.choose('asset'); if (path && dialog.open) await run(path); }
     catch(error) { showStatus(error.message,true); }
-  });
-  el('tool-search-form').addEventListener('submit',async event=>{
-    event.preventDefault();
-    const ticket=++revision;
-    const query=el('tool-query').value;
-    clearOutput();
-    showStatus('Searching open archives…');
-    try {
-      const result=await api('workspace-search',{query});
-      if (ticket!==revision) return;
-      showStatus(result.total.toLocaleString()+' matches'+(result.total>result.rows.length?' · first '+result.rows.length+' shown':''));
-      const list=node('div');
-      list.className='tool-scroll';
-      for (const row of result.rows) {
-        const item=action('',()=>{ dialog.close(); openFound(row,query).catch(error=>notify(error.message,true)); });
-        item.className='tool-result';
-        item.append(node('span',row.entry.name),node('small',row.archiveName));
-        list.append(item);
-      }
-      output.append(list);
-    } catch(error) { if (ticket===revision) showStatus(error.message,true); }
   });
   el('close-tool').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{

@@ -235,6 +235,29 @@ export function renderAsset(parent,result,select,save,onError,configureClip,arra
     if (result.lods.length>1) picker(parent,'Detail level',result.lods.map(n=>[n,'LOD '+n]),result.detail,n=>select(result.index,n));
     parent.append(element('p',result.triangles.toLocaleString()+' triangles'));
     if (result.embeddedLabel) parent.append(element('p','Embedded model label · '+result.embeddedLabel));
+    const dependencies=new Map();
+    for (const material of result.materials??[]) {
+      for (const texture of material.details?.textures??[]) if (texture.hash64) dependencies.set(texture.hash64,texture);
+    }
+    if (dependencies.size) {
+      const resolved=[...dependencies.values()].filter(texture=>texture.status==='ok').length;
+      const section=element('details');
+      section.append(element('summary','Texture dependencies · '+resolved+' of '+dependencies.size+' found in texture pools'));
+      for (const texture of dependencies.values()) {
+        const row=element('div');
+        row.className='dependency';
+        const found=texture.status==='ok';
+        row.append(element('code',texture.hash64),
+          element('span',(texture.param_name??texture.param_hash)+(found ? ' · '+texture.store+' · '+texture.width+'×'+texture.height+' '+texture.format
+            : ' · not in any texture pool (a default value is used)')));
+        if (found) {
+          const find=actionButton(row,'Find in game',()=>document.dispatchEvent(new CustomEvent('opensix:find',{detail:{query:'hash:'+texture.hash64}})));
+          find.className='link-button';
+        }
+        section.append(row);
+      }
+      parent.append(section);
+    }
     if (result.materials?.length) {
       const trace=element('details');
       trace.append(element('summary','Material and texture sources'),element('pre',JSON.stringify(result.materials,null,2)));

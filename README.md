@@ -1,6 +1,6 @@
 <h1><img src="app/icon.svg" alt="" width="66" align="middle"> OpenSix</h1>
 
-OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Open an RPF9, follow its nested archives, and preview or extract assets without launching the game. OpenSix reads your files in place.
+OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Point it at your game folder once and it shows the full folder and archive hierarchy, searches every nested RPF9, and previews or extracts assets without launching the game. OpenSix reads your files in place.
 
 **[Download OpenSix.exe for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
 
@@ -8,6 +8,9 @@ OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Ope
 
 ## What it does
 
+- **Open your game folder once.** OpenSix finds an installed copy, remembers your choice, and opens straight into the game's folders, archives and nested archives on every later launch. Use the tree, back, forward, up and breadcrumb navigation, and right-click any entry to preview, extract, export a model or copy its path.
+- **Search the whole game.** A persistent index covers every entry in every nested archive. Search file names, partial names, `*` and `?` wildcards, hashes (`hash:ab0d9aed`) and the drawable labels stored inside models, and filter by type. Results show their complete archive path. Names that match an archive hash are marked as verified or as coming from an embedded model label. Entries without a recovered name show their hash.
+- **Find and export characters.** Search a name such as `lucia` or `jason` and choose **Preview and export**. OpenSix groups the character's drawables, assembles them on one skeleton with their textures, and exports GLB or FBX.
 - **Browse RPF9 archives.** Open a file or scan a folder, drill into nested archives, and see entry sizes, offsets, hashes, compression, and encryption details. OpenSix checks signed headers and rejects incomplete archives.
 - **Find entries by name, hash, or model label.** Import a text list of paths to resolve more names. Embedded model labels are searchable, and entries with an unresolved path are still available by hash.
 - **Extract files.** Save decoded data when the storage format is supported, or save the original stored bytes. Search and batch-extract from the command line with stable entry IDs and JSON Lines reports.
@@ -30,8 +33,8 @@ OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Ope
 ## Getting started
 
 1. Run `OpenSix.exe`. It opens as a desktop app and needs no installer.
-2. Select **Open archive** and choose the matching local Scarlett executable, then choose an RPF9 file or a folder. Use **Open texture pool** for a standalone TTPF.
-3. Select an entry to preview it, extract it, or open its nested archive.
+2. On the first launch, choose your game folder from the detected list or with **Browse**. It is the folder that contains `game_scarlett_master.exe`. OpenSix remembers it and builds a search index in the background. You can browse right away.
+3. Browse the tree, search the whole game, select an entry to preview it, or right-click for extraction and export. **Archive → Open other RPF9** still opens a file from outside the game folder.
 
 Bring your own game files. OpenSix includes the VIctory decoder. To enable it for more textures, place its table file next to the EXE. The [usage guide](docs/usage.md) has the download link and explains how to add optional Bink and XMA2 playback.
 

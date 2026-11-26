@@ -1,8 +1,37 @@
 # Using OpenSix
 
+## First launch and the explorer
+
+On the first launch OpenSix looks for `game_scarlett_master.exe` on your fixed drives and lists what it finds. Choose a folder from the list or use **Browse**. OpenSix checks the executable, saves the folder in its own data folder (`%APPDATA%OpenSix`), and opens it on every later launch. **Archive → Game folder** changes the choice. OpenSix only reads the game folder. It writes its settings and index inside `%APPDATA%OpenSix`.
+
+The left tree shows the game folder, its `.rpf` archives, their nested archives, and the folders formed by entries whose paths are known. Click a node to open it. The list shows each file's icon, type, size and offset. Entries without a recovered path appear as their 64-bit hash in a monospaced font. A name that comes from a label stored inside a model carries a **label** badge. Entries whose hash matches a verified path show that path. Use the back, forward and up buttons (`Alt+Left`, `Alt+Right`, `Backspace`), the breadcrumb, `F5` to refresh, and `Ctrl+F` for search. Sort by clicking a column. Right-click an entry for **Preview**, **Extract file**, **Save stored bytes**, **Export model as GLB or FBX**, **Copy full path**, **Copy name** and **Copy hash**. The details pane shows the full archive path and the preview.
+
+The first launch also builds a search index in the background. The first part walks every archive directory (about two minutes). The second part reads the system page of each model to collect the drawable labels it stores. This takes several minutes the first time and a USB hard drive is slower, and the progress shows at the bottom of the tree. The index is saved, so search is instant on later launches, and an interrupted scan resumes. **Archive → Rebuild search index** discards it. OpenSix rebuilds it automatically when an archive file changes.
+
+## Searching the game
+
+Type in the search box at the top. By default it searches every nested archive. Choose **This location** to search below the folder you are viewing. The search matches names, labels and hashes together:
+
+| You type | OpenSix finds |
+| --- | --- |
+| `lucia` | Names and model labels that contain the text |
+| `cs_jason_*fullbody*` | Wildcards. `*` matches any text and `?` one character |
+| `hash:ab0d9aeda6791d76` or a full 8 or 16 digit hash | Entries with that 64-bit or 32-bit hash. A shorter prefix needs `hash:` or `0x` first |
+| `ext:zdd` or `type:zft,zdr` | Entries with that extension |
+| `hash:996fdba2db30cc12` | Also finds the texture pool entry with that key. A model's **Texture dependencies** list shows each material texture's key with a **Find in game** button |
+| `bc7 1024x1024 peds` | Texture pool entries by format, size and pool path |
+
+Use the chips under the heading to limit results to models, textures, animations and other types. Double-click a result to open its archive with the entry selected. Each result lists its full archive path. If a model-name scan is still running, the heading says so and more results appear as it advances. A result's name is never invented. It is either a verified path, a label stored in the model whose hash matches the entry (marked **label**), or the entry's hash.
+
+## Characters
+
+A character is a set of drawables whose embedded labels share a prefix, such as `cs_lucia`. Searching for a name shows the matching characters above the results. Choose **Preview and export**, or open **Assets → Characters**. The dialog lists the character's parts by slot, preselects a complete cutscene body and head when the character has one, assembles the parts on one skeleton with their textures, and shows the result in 3D. **Save GLB** and **Save FBX** write the same model. The preview and both exports carry the skeleton, skin weights, three UV layers and the base-color texture OpenSix could resolve.
+
+Modular clothing sets such as `player_story000_00` assemble their geometry and skeleton. Their garment textures come from the wardrobe system, which the character dialog does not read yet, so those parts can appear without colour. See [compatibility](compatibility.md).
+
 ## Top menus
 
-Use **Archive** to open files, import paths, search open archives, and export the selected archive index. When a complete supported `shaders.rpf` is selected, **Export shader index** writes the decoded records and their searchable names and links.
+Use **Archive** to change the game folder, search, open other files, import paths, and export the selected archive index. When a complete supported `shaders.rpf` is selected, **Export shader index** writes the decoded records and their searchable names and links.
 
 **Archive → Extract matching files** uses the current search, folder and name filter. It creates a new output folder with the decoded files and a report that lists any entries the decoder could not extract.
 
@@ -20,13 +49,13 @@ Open an archive with the matching executable, then choose **Archive → Create u
 
 For grooms, select the archive entry or open a `.osgroom` bundle with **Assets → Hair and fur guides**. The bundle preserves the original decoded system and graphics pages. The 3D view displays ribbons along the guide points. OBJ export stores the guides as lines.
 
-Download [OpenSix.exe](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. Choose the executable and archive from the supported Scarlett build. OpenSix reads the executable to get the archive format tables, and the game stays closed.
+Download [OpenSix.exe](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) and run it on Windows x64. Choose the game folder from the supported Scarlett build. OpenSix reads the executable in that folder to get the archive format tables, and the game stays closed.
 
 ## Archives and filenames
 
-**Open archive** takes an RPF9 file or a local folder. Select an archive in the sidebar, then select an entry to see its size, offset, hashes, and available preview. Use **Open nested archive** to go deeper. OpenSix rejects incomplete archives.
+The explorer opens archives and nested archives as folders. Select an entry to see its size, offset, hashes, and available preview. OpenSix rejects incomplete archives. **Open archive** (and **Archive → Open other RPF9**) adds a file or folder from outside the game folder under **Opened files** in the sidebar.
 
-Use **Import paths** with one candidate path per line. A matching path appears as a verified name. Use **Index model labels** to make the drawable names stored inside models searchable. A model label can describe the asset even when its original archive path is unknown.
+Use **Archive → Import paths** with one candidate path per line. A matching path appears as a verified name. The background index reads the drawable labels stored inside models and makes them searchable. When the 64-bit hash of a label matches its entry, the entry's name is that label plus its extension, shown with a **label** badge. A label can describe an asset even when its original archive path is unknown, and those entries stay unnamed.
 
 **Extract file** saves decoded data. **Save stored bytes** keeps the entry as it was stored in the archive.
 

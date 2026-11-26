@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <meta name="theme-color" content="#251631">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/explorer.css">
   <script type="module" src="/ui.mjs"></script>
 </head>
 <body>
@@ -16,14 +17,16 @@
       <details>
         <summary>Archive</summary>
         <div class="menu-items">
-          <button type="button" data-action="open">Open RPF9…</button>
+          <button type="button" data-action="gamefolder">Game folder…</button>
+          <button type="button" data-action="search">Search game… <kbd>Ctrl+F</kbd></button>
+          <button type="button" data-action="open">Open other RPF9…</button>
           <button type="button" data-action="pool">Open texture pool…</button>
           <button type="button" data-action="names" data-archive-only>Import paths…</button>
-          <button type="button" data-action="search" data-archive-only>Search open archives…</button>
           <button type="button" data-action="batch" data-archive-only>Extract matching files…</button>
           <button type="button" data-action="entries" data-archive-only>Export archive index…</button>
           <button type="button" data-action="shaders" data-archive-only>Export shader index…</button>
           <button type="button" data-action="create" data-archive-only>Create unsigned RPF9…</button>
+          <button type="button" data-action="reindex">Rebuild search index</button>
         </div>
       </details>
       <details>
@@ -39,6 +42,7 @@
       <details>
         <summary>Assets</summary>
         <div class="menu-items">
+          <button type="button" data-action="characters">Characters…</button>
           <button type="button" data-tool="toolHandling">Vehicle handling…</button>
           <button type="button" data-tool="toolGroom">Hair and fur guides…</button>
           <button type="button" data-tool="toolCloth">Cloth constraints…</button>
@@ -61,58 +65,74 @@
         </div>
       </details>
     </nav>
+    <form id="search-form" class="global-search" role="search">
+      <label class="sr-only" for="global-search">Search the game</label>
+      <input id="global-search" type="search" placeholder="Search the game: names, labels, hashes, *wildcards*" maxlength="250" autocomplete="off" spellcheck="false">
+      <select id="search-scope" aria-label="Search scope">
+        <option value="game">Entire game</option>
+        <option value="here">This location</option>
+      </select>
+    </form>
     <div class="toolbar">
-      <button id="import-names" type="button" disabled>Import paths</button>
+      <button id="import-names" type="button" disabled hidden>Import paths</button>
       <button id="open" class="primary" type="button">Open archive</button>
       <input id="name-file" type="file" accept=".txt,.csv,.list,text/plain" hidden>
     </div>
   </header>
   <main class="workspace">
-    <aside class="sidebar" aria-label="Archive navigation">
-      <h2>Archives</h2>
-      <nav id="archives" aria-label="Open archives"><p class="quiet">No archives open</p></nav>
-      <section id="folders-section" hidden>
-        <h2>Resolved folders</h2>
-        <nav id="folders" aria-label="Resolved folders"></nav>
+    <aside class="sidebar" aria-label="Game folder">
+      <h2>Game files</h2>
+      <nav id="tree" class="tree" role="tree" aria-label="Game folder tree"><p class="quiet">Loading the game library…</p></nav>
+      <section id="opened-section" hidden>
+        <h2>Opened files</h2>
+        <nav id="archives" aria-label="Opened files"></nav>
       </section>
+      <div id="index-status" class="index-status" role="status" hidden>
+        <p id="index-text"></p>
+        <progress id="index-progress" max="1" value="0"></progress>
+      </div>
     </aside>
-    <section class="contents" aria-label="Archive entries">
+    <section class="contents" aria-label="Archive contents">
+      <div class="navbar">
+        <div class="nav-buttons">
+          <button id="nav-back" type="button" title="Back (Alt+Left)" aria-label="Back" disabled>&#8592;</button>
+          <button id="nav-forward" type="button" title="Forward (Alt+Right)" aria-label="Forward" disabled>&#8594;</button>
+          <button id="nav-up" type="button" title="Up one level (Backspace)" aria-label="Up one level" disabled>&#8593;</button>
+          <button id="nav-refresh" type="button" title="Refresh (F5)" aria-label="Refresh">&#8635;</button>
+        </div>
+        <nav id="breadcrumb" class="breadcrumb" aria-label="Location"></nav>
+      </div>
       <div class="library-heading">
         <div>
-          <p id="breadcrumb" class="breadcrumb">Local workspace</p>
-          <h1 id="archive-name">Archive browser</h1>
-          <p id="archive-meta" class="quiet">Open an RPF9 archive or a folder of archives.</p>
+          <h1 id="archive-name">Game files</h1>
+          <p id="archive-meta" class="quiet"></p>
         </div>
       </div>
+      <div id="search-chips" class="chips" hidden role="group" aria-label="Filter results by type"></div>
+      <div id="search-characters" class="search-characters" hidden></div>
       <div id="entry-tools" class="entry-tools" hidden>
-        <label class="search"><span class="sr-only">Search entries</span>
-          <input type="search" id="search" placeholder="Search entries">
+        <label class="search"><span class="sr-only">Filter this folder</span>
+          <input type="search" id="search" placeholder="Filter this folder">
         </label>
-        <button id="index-model-labels" type="button">Index model labels</button>
-        <label><span class="sr-only">Filter entries</span>
+        <label><span class="sr-only">Name filter</span>
           <select id="filter">
             <option value="all">All entries</option>
-            <option value="resolved">Resolved names</option>
-            <option value="unresolved">Unresolved names</option>
+            <option value="resolved">Named</option>
+            <option value="unresolved">Unnamed (hash only)</option>
           </select>
         </label>
+        <button id="clear-search" type="button" hidden>Back to folder</button>
       </div>
       <p id="notice" class="notice" role="status" hidden></p>
-      <div id="entry-scroll" class="entry-scroll" hidden>
-        <table>
-          <thead><tr><th scope="col">Name</th><th scope="col">Format</th><th scope="col" class="number">Size</th><th scope="col" class="number">Offset</th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table>
+      <div id="listing" class="listing" hidden>
+        <div class="list-head" id="list-head" role="row"></div>
+        <div class="list-body" id="list-body" role="listbox" aria-label="Files" tabindex="0"></div>
       </div>
-      <div id="pager" class="pager" hidden>
-        <span id="page-text"></span>
-        <button id="previous" type="button">Previous</button>
-        <button id="next" type="button">Next</button>
-      </div>
+      <div id="list-status" class="list-status quiet"></div>
     </section>
     <aside class="details" aria-label="Entry details">
       <h2>Details</h2>
-      <p id="selection-empty" class="quiet">Select an entry to inspect or extract it.</p>
+      <p id="selection-empty" class="quiet">Select a file to inspect, preview or extract it.</p>
       <section id="selection" hidden>
         <p id="entry-kind" class="entry-kind"></p>
         <h3 id="entry-name"></h3>
@@ -121,7 +141,8 @@
         <div class="extract-actions">
           <button id="extract" class="primary" type="button">Extract file</button>
           <button id="stored" type="button">Save stored bytes</button>
-          <button id="nested" type="button" hidden>Open nested archive</button>
+          <button id="copy-path" type="button">Copy path</button>
+          <button id="nested" type="button" hidden>Open archive</button>
         </div>
         <h4>Preview</h4>
         <p id="preview-note" class="quiet"></p>
@@ -130,9 +151,39 @@
       </section>
     </aside>
   </main>
+  <div id="context-menu" class="context-menu" role="menu" hidden></div>
+  <dialog id="setup-dialog" aria-labelledby="setup-title">
+    <div class="dialog-title"><h2 id="setup-title">Set up OpenSix</h2><button id="close-setup" type="button" aria-label="Close" hidden>×</button></div>
+    <p>Choose your GTA VI game folder. It is the folder that contains <code>game_scarlett_master.exe</code> and the <code>.rpf</code> archives. OpenSix reads it in place and never changes it. The game does not need to be running.</p>
+    <p id="setup-detect" class="quiet" role="status">Looking for installed copies…</p>
+    <div id="setup-found" class="found-list"></div>
+    <label for="setup-path">Game folder</label>
+    <div class="path-picker">
+      <input id="setup-path" type="text" spellcheck="false" autocomplete="off">
+      <button id="setup-browse" type="button">Browse…</button>
+    </div>
+    <p id="setup-error" class="notice" role="alert" hidden></p>
+    <div class="dialog-actions"><button class="primary" id="setup-use" type="button">Use this folder</button></div>
+  </dialog>
+  <dialog id="character-dialog" aria-labelledby="character-title">
+    <div class="dialog-title"><h2 id="character-title">Characters</h2><button id="close-character" type="button" aria-label="Close characters">×</button></div>
+    <p class="quiet">Characters are assembled from the drawable labels stored inside the game's models. Each name below comes from a label in the game data.</p>
+    <div class="character-layout">
+      <div class="character-list-pane">
+        <label class="sr-only" for="character-query">Find a character</label>
+        <input id="character-query" type="search" placeholder="Find a character, e.g. lucia" maxlength="100" autocomplete="off">
+        <div id="character-list" class="character-list" role="listbox" aria-label="Characters"></div>
+      </div>
+      <div class="character-detail-pane">
+        <p id="character-status" class="notice" role="status" hidden></p>
+        <div id="character-parts"></div>
+        <div id="character-preview"></div>
+      </div>
+    </div>
+  </dialog>
   <dialog id="open-dialog">
     <form id="open-form">
-      <div class="dialog-title"><h2>Open RPF9 archives</h2><button id="close-dialog" type="button" aria-label="Close">×</button></div>
+      <div class="dialog-title"><h2>Open other RPF9 archives</h2><button id="close-dialog" type="button" aria-label="Close">×</button></div>
       <label for="exe-path">Matching Scarlett executable</label>
       <div class="path-picker">
         <input id="exe-path" type="text" required spellcheck="false">
@@ -158,10 +209,6 @@
         <button id="tool-browse" type="button">Open decoded file…</button>
         <label id="tool-road-filter" hidden><input type="checkbox" id="tool-roads"> Roads only</label>
       </div>
-    </form>
-    <form id="tool-search-form" hidden>
-      <label for="tool-query">Search names, hashes or model labels</label>
-      <div class="path-picker"><input id="tool-query" type="search" required maxlength="250"><button type="submit">Search</button></div>
     </form>
     <p id="tool-status" class="notice" role="status" hidden></p>
     <div id="tool-output"></div>

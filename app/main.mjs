@@ -1,16 +1,17 @@
 
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol, session } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, protocol, session, shell } from 'electron';
 import { constants as fsConstants, copyFileSync, createReadStream, createWriteStream, existsSync, linkSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { dispatch, prepareArchiveReport, prepareExport, prepareNewArchive, preparePreviewExport, scanEntries } from './workspace.mjs';
+import { dispatch, describeEntry, prepareArchiveReport, prepareExport, prepareNewArchive, preparePreviewExport, scanEntries } from './workspace.mjs';
 import { assetPreviewFile, clearAssetPreviews } from './asset-preview.mjs';
 import { withFbxExport } from './fbx-export.mjs';
 import { runCli } from './cli.mjs';
 import { stopMovie } from './bink-playback.mjs';
+import { Library } from './library.mjs';
 
 const APP_URL = 'opensix://app/';
 const bundle = dirname(fileURLToPath(import.meta.url));
@@ -18,6 +19,7 @@ const files = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/icon.svg', ['icon.svg', 'image/svg+xml']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
+  ['/explorer.css', ['explorer.css', 'text/css; charset=utf-8']],
   ['/ui.mjs', ['assets/ui.bundle.mjs', 'text/javascript; charset=utf-8']],
 ]);
 const policy = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' data:; form-action 'none'; base-uri 'none'; frame-ancestors 'none'";
@@ -29,6 +31,10 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'opensix', privileges: {
 } }]);
 
 nativeTheme.themeSource = 'dark';
+// Settings and the search index live beside the executable's profile, never in the game folder.
+app.setPath('userData', process.env.OPENSIX_DATA_DIR || join(app.getPath('appData'), 'OpenSix'));
+let library = null;
+let libraryReady = Promise.resolve();
 app.setAppUserModelId('local.opensix.desktop');
 app.commandLine.appendSwitch('disable-background-networking');
 
@@ -85,18 +91,41 @@ async function save(archive, entry, stored, mip) {
   return saveFile(file,mip!==undefined ? 'Save DDS mip chain' : stored ? 'Save stored bytes' : 'Extract file');
 }
 
-async function savePreview(id, name) {
+// A suggested file name keeps the asset's own name in the save dialog.
+const suggestion = (suggested, extension) => {
+  if (typeof suggested !== 'string') return undefined;
+  const stem = suggested.replace(/\.[^.]*$/, '').replace(/[^\w.@-]+/g, '_').slice(0, 120);
+  return stem ? stem + extension : undefined;
+};
+
+async function savePreview(id, name, suggested) {
   if (name === 'model.fbx') {
     return withFbxExport(preparePreviewExport(id, 'model.glb'), file =>
-      saveFile(file, 'Export FBX', [{ name: 'Autodesk FBX', extensions: ['fbx'] }]));
+      saveFile(file, 'Export FBX', [{ name: 'Autodesk FBX', extensions: ['fbx'] }], suggestion(suggested, '.fbx')));
   }
-  return saveFile(preparePreviewExport(id, name), 'Export decoded asset');
+  const file = preparePreviewExport(id, name);
+  const extension = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
+  return saveFile(file, 'Export decoded asset', undefined, name.startsWith('model.') ? suggestion(suggested, extension) : undefined);
 }
 
-async function saveFile(file, title, filters) {
+const workspaceEntryName = (archive, entry) => {
+  try { return describeEntry(archive, entry).name.split('/').at(-1); } catch { return undefined; }
+};
+
+async function exportModel(archive, entry, format) {
+  if (!['glb', 'fbx'].includes(format)) throw new Error('Choose GLB or FBX.');
+  const preview = await dispatch('/api/preview?' + new URLSearchParams({ archive, entry: String(entry) }));
+  if (preview?.type !== 'model') throw new Error(preview?.note || 'This entry has no model to export.');
+  return savePreview(preview.id, format === 'fbx' ? 'model.fbx' : 'model.glb', workspaceEntryName(archive, entry));
+}
+
+async function saveFile(file, title, filters, suggested) {
+  // Automated checks set OPENSIX_TEST_SAVE_DIR to write exports without the native dialog.
+  const testDirectory = process.env.OPENSIX_TEST_SAVE_DIR;
+  if (testDirectory && isAbsolute(testDirectory)) return saveTo(file, join(testDirectory, suggested ?? file.name));
   const picked = await dialog.showSaveDialog(window, {
     title,
-    defaultPath: join(app.getPath('downloads'), file.name),
+    defaultPath: join(app.getPath('downloads'), suggested ?? file.name),
     filters,
     properties: ['showOverwriteConfirmation'],
   });
@@ -144,14 +173,23 @@ async function saveTo(file,destination) {
   }
 }
 
-async function saveBatch({archive,query,scope,filter}) {
-  if (typeof query!=='string' || typeof scope!=='string' || !['all','resolved','unresolved'].includes(filter)) {
-    throw new Error('Invalid extraction filter.');
+async function saveBatch({archive,query,scope,filter,ids}) {
+  let rows;
+  if (Array.isArray(ids)) {
+    if (!ids.length || ids.length>20000 || ids.some(id=>!Number.isSafeInteger(id))) throw new Error('Invalid selection.');
+    const wanted=new Set(ids);
+    rows=[...scanEntries(archive,'',{scope:'',filter:'all'})].filter(row=>wanted.has(row.id));
+  } else {
+    if (typeof query!=='string' || typeof scope!=='string' || !['all','resolved','unresolved'].includes(filter)) {
+      throw new Error('Invalid extraction filter.');
+    }
+    rows=[...scanEntries(archive,query,{scope,filter})];
   }
-  const rows=[...scanEntries(archive,query,{scope,filter})];
   if (!rows.length) throw new Error('No entries match the current filter.');
-  const picked=await dialog.showOpenDialog(window,{title:'Choose where to extract '+rows.length+' matching entries',
-    properties:['openDirectory','createDirectory']});
+  const testDirectory=process.env.OPENSIX_TEST_SAVE_DIR;
+  const picked=testDirectory && isAbsolute(testDirectory) ? {canceled:false,filePaths:[testDirectory]}
+    : await dialog.showOpenDialog(window,{title:'Choose where to extract '+rows.length+' matching entries',
+      properties:['openDirectory','createDirectory']});
   if (picked.canceled || !picked.filePaths[0]) return null;
   const target=realpathSync(picked.filePaths[0]);
   if (!isAbsolute(target) || target.startsWith('\\\\')) throw new Error('Choose a local extraction folder.');
@@ -181,6 +219,7 @@ async function choosePath(kind) {
       filters:[{name:'RPF9 archives',extensions:['rpf','rpf9']}] },
     pool: { title:'Open texture pool', properties:['openFile'], filters:[{name:'Texture pools',extensions:['ttpf']}] },
     folder: { title:'Open folder of RPF9 archives', properties:['openDirectory'] },
+    'game-folder': { title:'Choose the GTA VI game folder (contains game_scarlett_master.exe)', properties:['openDirectory'] },
     asset: { title:'Choose a decoded resource or media file', properties:['openFile'] },
     'archive-files': { title:'Choose files for a new unsigned RPF9', properties:['openDirectory'] },
   };
@@ -218,7 +257,28 @@ export async function createWindow(show = true) {
   return window;
 }
 
+async function libraryRoute(route, payload = {}) {
+  if (route === 'status') return library.status();
+  if (route === 'detect') return Library.detect();
+  if (route === 'configure') return library.configure(payload.path);
+  if (route === 'forget') { library.forget(); return library.status(); }
+  if (route === 'rebuild') { library.rebuild(); return library.status(); }
+  if (route === 'browse') return library.browse(payload.id);
+  if (route === 'browse-opened') return library.browseOpened(payload.id);
+  if (route === 'search') return library.search(payload);
+  if (route === 'open-result') return library.openResult(payload);
+  if (route === 'characters') return library.listCharacters(payload.query);
+  if (route === 'character-parts') return library.characterParts(payload.prefix);
+  if (route === 'assemble-character') return library.assembleCharacter(payload);
+  throw new Error('Unknown library action.');
+}
+
 export const ready = app.whenReady().then(() => {
+  library = new Library(app.getPath('userData'));
+  const cli = process.argv.includes('--cli');
+  const gameFlag = process.argv.findIndex(argument => argument === '--game-dir');
+  const gameDir = gameFlag >= 0 ? process.argv[gameFlag + 1] : undefined;
+  libraryReady = cli ? Promise.resolve() : library.init({ gameDir }).catch(() => {});
   session.defaultSession.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
     (_details, callback) => callback({ cancel: true }),
@@ -234,6 +294,22 @@ export const ready = app.whenReady().then(() => {
     [{name:'RPF9 archive',extensions:['rpf']} ]));
   handle('opensix:save-batch',saveBatch);
   handle('opensix:choose', choosePath);
+  handle('opensix:export-model', exportModel);
+  handle('opensix:copy', text => {
+    if (typeof text !== 'string' || text.length > 65536) throw new Error('Nothing to copy.');
+    clipboard.writeText(text);
+    return true;
+  });
+  handle('opensix:reveal', rel => {
+    // Reveal a loose file or folder of the game in Explorer. Only paths inside the game folder are accepted.
+    if (!library?.gameDir || typeof rel !== 'string' || /(^|[\\/])\.\.([\\/]|$)/.test(rel) || isAbsolute(rel)) throw new Error('Invalid location.');
+    shell.showItemInFolder(join(library.gameDir, rel));
+    return true;
+  });
+  handle('opensix:library', async (route, payload) => {
+    await libraryReady;
+    return libraryRoute(route, payload);
+  });
 });
 
 const cliFlag=process.argv.indexOf('--cli');

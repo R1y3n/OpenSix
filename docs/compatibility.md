@@ -24,6 +24,8 @@ Check a local copy with `Get-FileHash -Algorithm SHA256 -LiteralPath '<path to e
 | Bink / Bink 2 | Built-in Bink 2 video playback and DCT audio track export. The local helper supports Bink 1 and synchronized audio. |
 | 0DRP v122 and PSIN | Inspect structure and section information and save JSON reports. |
 | MHIU, PNG, JPEG, GIF, WebP, WAV, Ogg | Preview supported heightmaps, images, and audio inside an archive. |
+| Game folder explorer and search | Open the game folder, nested archives and texture pools in a tree, and search every archive entry and every texture pool entry by name, wildcard, hash, extension, format, size and embedded model label. The indexes are cached in `%APPDATA%OpenSix`. |
+| Characters | Group model labels by character prefix, assemble the parts of a character on one skeleton and export GLB or FBX. A complete cutscene body and head, such as `cs_lucia` and `cs_jason`, has colour textures. |
 | Tool menu | Cross-archive search and JSON index export, interactive MHIU terrain, typed PSIN, localization CSV and JSON, navigation GLB and FBX, map placement and weather reports, vehicle handling, groom and cloth OBJ, particle rules, and script XML for recognized records. |
 | SGD5 shader records | Browse shader groups, members and effect links from a complete supported `shaders.rpf`. Extract decoded DXBC blocks. |
 | Xbox GPU BVH | Inspect and export the verified sample tied to its matching drawable. Other BVH layouts need independent verification. |
@@ -31,6 +33,10 @@ Check a local copy with `Get-FileHash -Algorithm SHA256 -LiteralPath '<path to e
 | GTA V resources | Convert placements to YMAP, OBJ to YDR or YBN, DDS to YTD and archetype JSON to YTYP. Target-game validation is separate from format verification. |
 
 ## Known limits
+
+- Archive entry names are 64-bit hashes. OpenSix shows a path only when a hash matches a verified path or a model's own label. Most entries remain hash-only, and searches cannot match a name that the game data does not store.
+- Texture pools have no names, so a texture is found by its key hash (the value a model material lists), its pool, format or size.
+- Modular ped clothing (for example `player_story000_00`) assembles geometry and skeleton, but its garment textures come from the wardrobe catalog and are not applied by the character dialog. Hair and fur strands are separate groom resources and are not attached to assembled characters.
 
 - Source archives open read-only. The writer creates new unsigned archives with regular file records. Signed retail repacking and resource replacement remain open.
 - Paths are verified against the archive hashes. Two names in the local `common.rpf` audit, slots 243 and 316, remain unresolved. Their heightmap payloads can still be previewed and extracted.
