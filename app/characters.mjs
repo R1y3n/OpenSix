@@ -30,13 +30,14 @@ const slots = [
 const accessories = [
   ['hat', 'hat'], ['cap', 'hat'], ['helmet', 'hat'], ['beanie', 'hat'], ['sunglasses', 'glasses'], ['glasses', 'glasses'],
   ['backpack', 'bag'], ['bag', 'bag'], ['watch', 'watch'], ['necklace', 'neck'], ['chain', 'neck'], ['earring', 'ears'],
-  ['glove', 'gloves'], ['mask', 'mask'],
+  ['glove', 'gloves'], ['mask', 'mask'], ['bracelet', 'wrist'], ['anklet', 'ankle'],
 ];
 
 const longest = (table, item) => table.filter(([word]) => item.startsWith(word))
   .reduce((best, entry) => (!best || entry[0].length > best[0].length ? entry : best), null)?.[1] ?? null;
 
-function slotOf(item) { return item === 'head' ? 'head' : longest(slots, item); }
+// `bra` is a slot word, but bracelets are not bras.
+function slotOf(item) { return item === 'head' ? 'head' : item.startsWith('bracelet') ? null : longest(slots, item); }
 
 // Parts of one character prefix, grouped by outfit slot. The default look is one part per slot.
 export function outfitOptions(parts, prefix) {
@@ -71,6 +72,25 @@ export function outfitOptions(parts, prefix) {
   if (chosen.has('outer')) chosen.delete('top');
   for (const option of options) option.default = chosen.get(option.group) === option.rowIndex;
   return options;
+}
+
+// The outfit slot of a drawable label (`cs_jason_haircaesar_mr1_000_…`, `shoescanvas_mr1_001_…`): the item word is the token
+// before the fit tag, and the same slot rules as for a character's own parts apply.
+export function partGroup(label) {
+  const tokens = label.toLowerCase().split('_');
+  const at = tokens.findIndex(isFit);
+  const item = at > 0 ? tokens[at - 1] : tokens[0];
+  const slot = slotOf(item);
+  if (slot === 'head' && label.includes('_eyes')) return 'head eyes';
+  if (slot === 'head' && label.includes('_earring')) return 'head earring';
+  return slot ?? longest(accessories, item) ?? item;
+}
+
+// The item word of a label, for names in lists.
+export function partItem(label) {
+  const tokens = label.toLowerCase().split('_');
+  const at = tokens.findIndex(isFit);
+  return at > 0 ? tokens[at - 1] : tokens[0];
 }
 
 // ----- shared body skin -----

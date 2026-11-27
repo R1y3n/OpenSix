@@ -26,8 +26,8 @@ int convert(const std::filesystem::path& inputPath, const std::filesystem::path&
         throw std::runtime_error(importer.GetErrorString());
     }
     std::unique_ptr<aiScene> scene(importer.GetOrphanedScene());
-    // glTF materials carry metallic and roughness. The FBX exporter writes metallic as ReflectionFactor and
-    // roughness as a Phong shininess exponent, which Blender reads back as metallic = ReflectionFactor and
+    // glTF materials carry metallic and roughness. The FBX exporter writes metallic as ReflectionFactor and roughness
+    // as a Phong shininess exponent, which Blender reads back as metallic = ReflectionFactor and
     // roughness = 1 - sqrt(shininess) / 10. The glTF importer's own shininess ((1 - roughness)^2 * 1000) and the
     // exporter's default ReflectionFactor of 1 would make every material a near-mirror metal, so write the values
     // that give the same metallic and roughness back.
@@ -38,6 +38,12 @@ int convert(const std::filesystem::path& inputPath, const std::filesystem::path&
         material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
         metallic = std::clamp(metallic, 0.0f, 1.0f);
         roughness = std::clamp(roughness, 0.0f, 1.0f);
+        // glTF's specular factor (1 unless KHR_materials_specular sets it) is Blender's specular level 0.5. Blender reads
+        // the level from the FBX as SpecularFactor * 2, and the FBX exporter's default SpecularFactor of 1 would give 1.0.
+        float specular = 1.0f;
+        material->Get(AI_MATKEY_SPECULAR_FACTOR, specular);
+        const float specularFactor = 0.25f * std::clamp(specular, 0.0f, 1.0f);
+        material->AddProperty(&specularFactor, 1, AI_MATKEY_SPECULAR_FACTOR);
         const float reflectivity = metallic;
         // A shininess of zero would make the exporter write a Lambert material, so keep it just above zero.
         const float shininess = std::max(0.01f, std::pow(10.0f * (1.0f - roughness), 2.0f));

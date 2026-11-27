@@ -283,7 +283,13 @@ async function assemble(input) {
   const requests=parts.map(({row,source,...request})=>request);
   const [base,...others]=requests;
   const clip=readClip(input.clip,state);
-  return buildAssetPreview({...base,kind:'model',parts:others,clip_index:clip ? input.clip.index : null},data[0],clip,data.slice(1));
+  // Shared ped skeletons (male and female) that ped clothing is skinned to. They travel as extra files after the parts.
+  const skeletons=(input.skeletons??[]).map(item=>({female:Boolean(item.female),...assemblySource(state,item)}));
+  if (skeletons.length>2) fail('Choose at most one shared skeleton for each body.');
+  const skeletonData=skeletons.map(skeleton=>decodePayload(state.game,skeleton.source,skeleton.row));
+  const skeletonFiles=skeletons.map((skeleton,index)=>({female:skeleton.female,system_size:skeleton.system_size,file:'part-'+(others.length+index)+'.bin'}));
+  return buildAssetPreview({...base,kind:'model',parts:others,skeletons:skeletonFiles,clip_index:clip ? input.clip.index : null},
+    data[0],clip,[...data.slice(1),...skeletonData]);
 }
 
 async function assembleWardrobe(input) {
@@ -795,8 +801,8 @@ export function browseArchive(key, folder = '') {
   };
 }
 
-export async function assembleParts(parts, clip) {
-  return assemble({ parts, clip });
+export async function assembleParts(parts, clip, skeletons = []) {
+  return assemble({ parts, clip, skeletons });
 }
 
 export const workspaceNames = () => workspace?.names ?? null;

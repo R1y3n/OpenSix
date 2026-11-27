@@ -46,7 +46,9 @@ function Apply-DependencyPatch($Path, $Patch) {
 }
 
 Apply-DependencyPatch $decoder (Join-Path $root 'third_party/sixng/preview-api.patch')
+Apply-DependencyPatch $decoder (Join-Path $root 'third_party/sixng/ped-skeleton-install.patch')
 Apply-DependencyPatch $assimp (Join-Path $root 'third_party/assimp/fbx-uv-layers.patch')
+Apply-DependencyPatch $assimp (Join-Path $root 'third_party/assimp/fbx-specular-factor.patch')
 Apply-DependencyPatch $explorer (Join-Path $root 'third_party/rpf9-explorer/ttpf-preview.patch')
 Apply-DependencyPatch $victory (Join-Path $root 'third_party/victory/external-tables.patch')
 

@@ -1,0 +1,13 @@
+diff --git a/code/AssetLib/FBX/FBXExporter.cpp b/code/AssetLib/FBX/FBXExporter.cpp
+--- a/code/AssetLib/FBX/FBXExporter.cpp
++++ b/code/AssetLib/FBX/FBXExporter.cpp
+@@ -1571,6 +1571,9 @@ void FBXExporter::WriteObjects () {
+             if (m->Get(AI_MATKEY_SHININESS_STRENGTH, f) == aiReturn_SUCCESS) {
+                 p.AddP70numberA("ShininessFactor", f);
+             }
++            if (m->Get(AI_MATKEY_SPECULAR_FACTOR, f) == aiReturn_SUCCESS) {
++                p.AddP70numberA("SpecularFactor", f);
++            }
+             if (m->Get(AI_MATKEY_SHININESS, f) == aiReturn_SUCCESS) {
+                 p.AddP70numberA("ShininessExponent", f);
+             }

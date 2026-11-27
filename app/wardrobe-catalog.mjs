@@ -202,3 +202,63 @@ export function taggedVariants(catalog) {
   }
   return byName;
 }
+
+// ----- outfits -----
+// A character's own wardrobe kit (`<character>.zkit`) holds its outfits. A kit lists presets (garments, each with a state:
+// which drawable and textures to wear) and other kits. The kits that no other kit contains are the complete outfits.
+export const DEFAULT_TINT_PALETTE = 0x05317603; // joaat('ped_tint_vstation_generic'), used when the item that sets the tint names none
+
+const unsetTint = tints => (tints[0] === 255 && tints[1] === 255 && tints[2] === 255) || (tints[0] === 0 && tints[1] === 0 && tints[2] === 0);
+
+export function outfitRoots(catalog) {
+  const byId = new Map(catalog.kits.map(kit => [kit.id, kit]));
+  const inside = new Set();
+  for (const kit of catalog.kits) for (const member of kit.members) if (byId.has(member.child)) inside.add(member.child);
+  return catalog.kits.filter(kit => !inside.has(kit.id));
+}
+
+// Every (preset, state) of a kit, with the kits it contains expanded in place.
+export function expandKit(catalog, kit, seen = new Set(), depth = 0) {
+  if (seen.has(kit.id) || depth > 12) return [];
+  seen.add(kit.id);
+  const byId = catalog.kitsById ??= new Map(catalog.kits.map(item => [item.id, item]));
+  const out = [];
+  for (const member of kit.members) {
+    const inner = byId.get(member.child);
+    if (inner) out.push(...expandKit(catalog, inner, seen, depth + 1));
+    else if (catalog.presets.has(member.child)) out.push({ preset: catalog.presets.get(member.child), state: member.state });
+  }
+  return out;
+}
+
+// What a preset wears in a state: the drawable (by archive hash, or by name hashes for presets that list them), its
+// textures, and the tint. Values the state leaves empty come from the parent presets, as for drawableVariants.
+export function wornState(catalog, preset, stateId) {
+  let drawable = ZERO, albedo = ZERO, normal = ZERO, extra = ZERO;
+  const seen = new Set();
+  for (let current = preset, depth = 0; current && depth < 64 && !seen.has(current.id); current = catalog.presets.get(current.parent), depth++) {
+    seen.add(current.id);
+    const state = current.states.find(candidate => candidate.id === stateId);
+    if (state) {
+      if (drawable === ZERO) drawable = state.drawable;
+      if (albedo === ZERO) albedo = state.albedo;
+      if (normal === ZERO) normal = state.normal;
+      if (extra === ZERO) extra = state.extra;
+    }
+    if (!current.parent) break;
+  }
+  // The tint comes from the first item up the chain whose bytes are neither "inherit" (255) nor "unset" (0).
+  let tint = null;
+  seen.clear();
+  for (let current = preset, depth = 0; current && depth < 64 && !seen.has(current.id); current = catalog.presets.get(current.parent), depth++) {
+    seen.add(current.id);
+    if (!unsetTint(current.tints)) { tint = { palette: current.palette || DEFAULT_TINT_PALETTE, rows: [...current.tints], item: current.id }; break; }
+    if (!current.parent) break;
+  }
+  const names = [];
+  for (let current = preset, depth = 0; current && depth < 64; current = catalog.presets.get(current.parent), depth++) {
+    if (current.drawables.length) { names.push(...current.drawables); break; }
+    if (!current.parent) break;
+  }
+  return { drawable, albedo, normal, extra, tint, names };
+}

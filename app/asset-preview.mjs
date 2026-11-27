@@ -165,6 +165,11 @@ function removePreview(id) {
   if (folder) rmSync(folder,{recursive:true,force:true});
 }
 
+// Remove a kept preview and its files, for one that was only a way to receive a decoder's output.
+export function discardPreview(id) {
+  removePreview(id);
+}
+
 // The folder that holds a kept preview's files, for code that finishes a model after the decoder wrote it.
 export function previewFolder(id) {
   return outputs.get(id)?.folder ?? null;

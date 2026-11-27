@@ -13,6 +13,7 @@ export const tintableGroups = new Set(['top', 'outer', 'bottom', 'full', 'feet',
 // Most clothing in the catalogue stores no colour: the game sets it at run time. These are colours to choose from.
 export const fabricColours = {
   list: [
+    { id: 'game', name: 'From the outfit', rgb: null },
     { id: 'natural', name: 'Natural (fabric shade)', rgb: null },
     { id: 'denim', name: 'Denim blue', rgb: [78, 104, 148] },
     { id: 'black', name: 'Black', rgb: [34, 34, 36] },
@@ -154,6 +155,32 @@ export function tintTexture(image, rgb) {
   return encodePng(width, height, out);
 }
 
+// ----- tint palettes -----
+// A palette is a 64 x 256 sRGB image. Each row is one colour as a dark-to-light ramp in texels 2 to 55. A garment without a
+// colour texture has a shade map (green channel); its colour is the palette row of its tint at that shade.
+const RAMP_START = 2, RAMP_END = 55;
+
+export function samplePalette(palette, row, shade) {
+  const y = Math.min(row, palette.height - 1);
+  const x = RAMP_START + (shade * (RAMP_END - RAMP_START)) / 255;
+  const x0 = Math.floor(x), f = x - x0;
+  const at = column => (y * palette.width + Math.min(column, palette.width - 1)) * 4;
+  const a = at(x0), b = at(x0 + 1);
+  return [0, 1, 2].map(k => Math.round(palette.rgba[a + k] + (palette.rgba[b + k] - palette.rgba[a + k]) * f));
+}
+
+// The shade map coloured through a palette row. Returns an encoded PNG.
+export function tintWithPalette(image, palette, row) {
+  const { width, height, channels, data } = image;
+  const lut = Array.from({ length: 256 }, (_, shade) => samplePalette(palette, row, shade));
+  const out = Buffer.alloc(width * height * 3);
+  for (let i = 0; i < width * height; i++) {
+    const colour = lut[channels >= 2 ? data[i * channels + 1] : data[i * channels]];
+    out[i * 3] = colour[0]; out[i * 3 + 1] = colour[1]; out[i * 3 + 2] = colour[2];
+  }
+  return encodePng(width, height, out);
+}
+
 // ----- GLB reading and writing -----
 function readGlb(path) {
   const file = readFileSync(path);
@@ -207,7 +234,7 @@ function readInside(folder, name) {
 // `head`: the head's albedo key, whose texture gives the skin tone. `skin`: names of the shared arms, hands, legs and feet,
 // whose materials bind no colour texture and would show flat grey. `fabrics`: [{ name, colour }] for garments to colour.
 // Returns what was applied. The model is left as it was when nothing applies or the preview is gone.
-export function finishAssembly(id, { head = null, skin = [], fabrics = [] } = {}) {
+export function finishAssembly(id, { head = null, skin = [], fabrics = [], palettes = null } = {}) {
   const folder = previewFolder(id);
   const applied = { skinTone: null, fabricColours: [] };
   if (!folder) return applied;
@@ -248,16 +275,23 @@ export function finishAssembly(id, { head = null, skin = [], fabrics = [] } = {}
       }
     }
   }
-  for (const { name, colour } of fabrics) {
+  for (const { name, colour, tint } of fabrics) {
     const choice = fabricColours.list.find(item => item.id === colour);
-    if (!choice?.rgb) continue;
+    // The colour the outfit gives the garment: its palette at its tint row. Tint 0 is off at 255. Only the first of the
+    // three tints is applied, because how the shade map's other channels select the others is not decoded.
+    const palette = colour === 'game' && tint && tint.rows[0] !== 255 ? palettes?.get(tint.palette) : null;
+    if (!palette && !choice?.rgb) continue;
     for (const index of partMaterials(json, name)) {
       const material = json.materials[index];
       // A material with a colour texture keeps it: the colour is only for garments that have the shade map alone.
       const shade = material.extras?.ped_tint?.png;
       if (!shade || material.extras.wardrobe?.albedo) continue;
-      try { setTexture(material, addTexture(tintTexture(decodePng(readInside(folder, shade)), choice.rgb))); } catch { continue; }
-      applied.fabricColours.push({ part: name, colour: choice.id });
+      try {
+        const source = palette ? material.extras.ped_tint.shade_texture ?? shade : shade;
+        const image = decodePng(readInside(folder, source));
+        setTexture(material, addTexture(palette ? tintWithPalette(image, palette, tint.rows[0]) : tintTexture(image, choice.rgb)));
+      } catch { continue; }
+      applied.fabricColours.push({ part: name, colour: palette ? 'game' : choice.id });
     }
   }
   if (added.length) {
