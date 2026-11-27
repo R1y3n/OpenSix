@@ -1,12 +1,33 @@
 <h1><img src="app/icon.svg" alt="" width="66" align="middle"> OpenSix</h1>
 
-OpenSix is a portable Windows archive browser for GTA VI’s Scarlett build. Point it at your game folder once and it shows the full folder and archive hierarchy, searches every nested RPF9, and previews or extracts assets without launching the game. OpenSix reads your files in place.
+OpenSix is a read-only archive browser for GTA VI’s Scarlett build. This fork builds it natively for Linux x64; the original portable Windows x64 build is still available upstream. Point it at your game folder once and it shows the full folder and archive hierarchy, searches every nested RPF9, and previews or extracts assets without launching the game. OpenSix reads your files in place.
 
-**[Download OpenSix 1.5.0 for Windows x64](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe)** · **[Linux x64 build from this fork](https://github.com/R1y3n/OpenSix/releases/latest)** · [All releases](https://github.com/cyberpulse2077/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
+**[Download the latest Linux x64 build (AppImage, deb, tar.xz)](https://github.com/R1y3n/OpenSix/releases/latest)** · [Windows x64 build from upstream](https://github.com/cyberpulse2077/OpenSix/releases/latest/download/OpenSix.exe) · [All Linux releases](https://github.com/R1y3n/OpenSix/releases) · [How to use it](docs/usage.md) · [Supported formats](docs/compatibility.md) · [GTA VI tool audit](docs/tool-audit.md)
 
-The native Linux build (AppImage, deb and tar.xz) is produced by [GitHub Actions](.github/workflows/build-linux.yml); see the [Linux build notes](docs/build.md#linux-build).
+Every push to this fork builds and publishes the Linux packages with [GitHub Actions](.github/workflows/build-linux.yml): no Wine, no local Rust toolchain, and three ready-to-run artifacts per release. See the [Linux build notes](docs/build.md#linux-build).
 
 ![OpenSix decoding a diner scene from GTA VI’s UI texture pool](docs/images/archive-browser.png)
+
+## Linux x64
+
+This fork's releases ship three native packages for x86_64 Linux: an AppImage, a `.deb`, and a `.tar.xz`. Each one bundles the Linux preview, texture-pool, FBX, BCPack and 6ixpack helpers as ELF binaries and shared libraries. The Windows `.exe` remains an upstream build; this fork does not replace it.
+
+```bash
+# AppImage
+chmod +x OpenSix-*-x86_64.AppImage
+./OpenSix-*-x86_64.AppImage
+# If FUSE is unavailable:
+./OpenSix-*-x86_64.AppImage --appimage-extract-and-run
+
+# Debian/Ubuntu
+sudo apt install ./OpenSix-*-amd64.deb
+
+# Portable archive
+tar -xf OpenSix-*-x64.tar.xz
+# Then run the OpenSix executable in the extracted folder.
+```
+
+The AppImage needs `libfuse2` unless extracted. XMA2 playback uses FFmpeg from `PATH` or `OPENSIX_FFMPEG`; Bink 1 movies still need an external verified `bink-player` helper. See the [usage guide](docs/usage.md) and [Linux build notes](docs/build.md#linux-build) for details.
 
 ## Characters
 
@@ -37,18 +58,18 @@ Search a name, choose **Preview and export**, and OpenSix assembles the characte
 - **Inspect more resource types.** Read vehicle handling, particle rules and keyframes, groom guides, and cloth constraints. Save hair guides and cloth constraints as OBJ lines. Open a decoded audio bank or Bink movie from the **Assets** menu.
 - **Search localization tables.** Search a decoded table by label hash or text and save CSV or JSON. Read typed PSIN fields and export recognized script documents as XML.
 - **Inspect shader groups and Xbox GPU BVH data.** Browse decoded SGD5 members and effect links in a complete supported `shaders.rpf`. Preview the geometry for the verified Xbox GPU BVH sample and export it with its compressed BVH, geometry buffers, transforms and address descriptors.
-- **Tell you about new releases.** OpenSix checks GitHub's public release list each time it starts and shows a note when a newer version exists. The request carries only the name and version of OpenSix, nothing about you or your game. It never installs anything by itself, and the check can be switched off in **About**.
+- **Tell you about new Windows releases.** The portable Windows build checks GitHub's public release list each time it starts and shows a note when a newer version exists. The request carries only the name and version of OpenSix, nothing about you or your game. It never installs anything by itself, and the check can be switched off in **About**. The native Linux build does not make this request; check [this fork's releases](https://github.com/R1y3n/OpenSix/releases) for new packages.
 - **Create unsigned RPF9 archives.** Pack a folder of files, then reopen it with the original relative paths in OpenSix.
 - **Convert assets for GTA V mods.** Save YMAP placements, YDR drawables, YBN collision files, YTD textures, and YTYP archetypes from supported inputs.
 - **Play Bink 2 video and export audio.** Step and seek with the built-in decoder, and save supported DCT tracks as WAV.
 
 ## Getting started
 
-1. Run `OpenSix.exe`. It opens as a desktop app and needs no installer.
+1. Run a Linux package from [this fork's releases](https://github.com/R1y3n/OpenSix/releases/latest) — AppImage, `.deb` or `.tar.xz`. On Windows, run the upstream `OpenSix.exe`. Both open as desktop apps; only the `.deb` needs installing.
 2. On the first launch, choose your game folder from the detected list or with **Browse**. It is the folder that contains `game_scarlett_master.exe`. OpenSix remembers it and builds a search index in the background. You can browse right away.
 3. Browse the tree, search the whole game, select an entry to preview it, or right-click for extraction and export. **Archive → Open other RPF9** still opens a file from outside the game folder.
 
-Bring your own game files. OpenSix includes the VIctory decoder. To enable it for more textures, place its table file next to the EXE. The [usage guide](docs/usage.md) has the download link and explains how to add optional Bink and XMA2 playback.
+Bring your own game files. OpenSix includes the VIctory decoder. To enable it for more textures, set `OPENSIX_BCPACK_TABLES` to its table file (or place the file beside the app resources on Windows). The [usage guide](docs/usage.md) explains the optional Bink and XMA2 playback helpers on both platforms.
 
 ## Inside the texture viewer
 
@@ -62,7 +83,7 @@ OpenSix supports one GTA VI Xbox Series X|S (Scarlett) build. The [compatibility
 
 ## Source and credits
 
-See the [Windows build instructions](docs/build.md) and [contribution notes](CONTRIBUTING.md). The native tools use [SixNG](https://github.com/holdmysocks/SixNG), [rpf9-explorer](https://github.com/breadbbbb/rpf9-explorer), [VIctory](https://github.com/Marvisak/VIctory), and [Assimp](https://github.com/assimp/assimp). The app uses [Electron](https://www.electronjs.org/) and [Three.js](https://threejs.org/). The archive workflow takes its cues from [OpenIV](https://openiv.com/).
+See the [Windows and Linux build instructions](docs/build.md) and [contribution notes](CONTRIBUTING.md). This fork's Linux packages are produced from the same pinned dependencies as the Windows build, with Linux helpers compiled on GitHub Actions. The native tools use [SixNG](https://github.com/holdmysocks/SixNG), [rpf9-explorer](https://github.com/breadbbbb/rpf9-explorer), [VIctory](https://github.com/Marvisak/VIctory), and [Assimp](https://github.com/assimp/assimp). The app uses [Electron](https://www.electronjs.org/) and [Three.js](https://threejs.org/). The archive workflow takes its cues from [OpenIV](https://openiv.com/).
 
 ## License
 
