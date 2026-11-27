@@ -47,7 +47,9 @@ init_dep bink2     https://github.com/codingkoala/bink2-decoder.git  2e709c23023
 init_dep 6to5m     https://github.com/DesignWithTommy/6to5m.git      5d62e745bb4413d7f21923b23c713b6651728868
 
 apply_patch "$deps/sixng"    "$root/third_party/sixng/preview-api.patch"
+apply_patch "$deps/sixng"    "$root/third_party/sixng/ped-skeleton-install.patch"
 apply_patch "$deps/assimp"   "$root/third_party/assimp/fbx-uv-layers.patch"
+apply_patch "$deps/assimp"   "$root/third_party/assimp/fbx-specular-factor.patch"
 apply_patch "$deps/rpf9-explorer" "$root/third_party/rpf9-explorer/ttpf-preview.patch"
 apply_patch "$deps/victory"  "$root/third_party/victory/external-tables.patch"
 
@@ -98,6 +100,9 @@ cp "$deps/fbx-build-linux/opensix-fbx" "$worker/"
     printf '\n\n'
   done
 } > "$worker/Assimp.LICENSE.txt"
+
+echo "==> Node tests"
+node --test "$root/scripts/test-outfits.mjs"
 
 echo "==> Electron UI and Linux packages"
 (

@@ -51,7 +51,7 @@ To build a portable Windows executable locally, run the script with `-Portable`.
 
 ## Linux build
 
-The Linux build is native, not Wine or a Windows cross-compile. GitHub Actions runs it on `ubuntu-22.04` via [`.github/workflows/build-linux.yml`](../.github/workflows/build-linux.yml). Push a commit or run the **Build Linux** workflow manually; the workflow uploads an `OpenSix-linux-x64` artifact with AppImage, deb and tar.xz packages. Tags beginning with `v` and manual runs with **Publish prerelease** also create a GitHub prerelease.
+The Linux build is native, not Wine or a Windows cross-compile. GitHub Actions runs it on `ubuntu-22.04` via [`.github/workflows/build-linux.yml`](../.github/workflows/build-linux.yml). Push a commit or run the **Build Linux** workflow manually; the workflow uploads an `OpenSix-linux-x64` artifact with AppImage, deb and tar.xz packages. Every push creates or updates a GitHub prerelease tagged `linux-<commit-sha>` (or the pushed `v` tag) and attaches all three packages; manual runs can publish the same way with **Publish prerelease**.
 
 The entry point is [`scripts/build-linux.sh`](../scripts/build-linux.sh). It checks out the same pinned dependency revisions as the Windows build, applies the same patches, and then builds:
 

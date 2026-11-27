@@ -25,6 +25,7 @@ files:
   - characters.mjs
   - wardrobe-catalog.mjs
   - ped-finish.mjs
+  - outfit-look.mjs
   - updates.mjs
   - update-service.mjs
   - native-tools.mjs
